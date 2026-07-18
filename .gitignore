@@ -1,0 +1,29 @@
+# Dependencias e Instalación (Aplica a raíz, client y server)
+node_modules/
+.pnpm-store/
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Archivos de Entorno y Credenciales de Seguridad (CRÍTICO)
+.env
+.env.*
+!.env.example
+
+# Compilación y Salidas de Build
+dist/
+build/
+.next/
+
+# Herramientas de Empaquetado de Contexto (Repomix y Agentes)
+repomix*.xml
+*.xml
+.agents/
+skills-lock.json
+
+# Archivos del Sistema Operativo y Editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log

@@ -1,0 +1,98 @@
+@import "tailwindcss";
+
+@theme {
+  /* Paleta "Editorial Moderno" */
+  --color-paper:       #F5F0E8;   /* fondo crema */
+  --color-paper-dark:  #EDE7D9;   /* tarjetas, separadores */
+  --color-ink:         #1C1917;   /* texto primario */
+  --color-ink-muted:   #57534E;   /* texto secundario */
+  --color-forest:      #2D5016;   /* acento principal / WA */
+  --color-forest-light:#3D6B21;   /* hover */
+  --color-amber:       #B45309;   /* precio, badge oferta */
+  --color-surface:     #FFFFFF;
+
+  /* Tipografía */
+  --font-serif:   "Playfair Display", Georgia, serif;
+  --font-sans:    "Inter", system-ui, sans-serif;
+
+  /* Radios */
+  --radius-card:  0.75rem;
+  --radius-badge: 9999px;
+}
+
+@layer base {
+  html {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    scroll-behavior: smooth;
+  }
+  body {
+    font-family: var(--font-sans);
+    min-height: 100vh;
+    margin: 0;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-serif);
+  }
+}
+
+/* Animations */
+@keyframes slide-in-right {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out forwards;
+}
+
+/* Custom scrollbar for a premium look */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-paper);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-paper-dark);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-ink-muted);
+}
+
+/* Ocultar barras de scroll manteniendo funcionalidad */
+.scrollbar-none {
+  -ms-overflow-style: none;  /* IE y Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari y Opera */
+}
+
+/* Animación de marquesina infinita para libros destacados */
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  display: flex;
+  width: max-content;
+  animation: marquee 40s linear infinite;
+}
+
