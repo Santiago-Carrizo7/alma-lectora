@@ -41,6 +41,5 @@ app.use('/api/v1/config', configRouter);
 app.use(errorHandler);
 
 // Handler compatible con Vercel Serverless
-export const handler = serverless(app);
-
+export default app;
 export { app };
