@@ -5,9 +5,9 @@
     "node": ">=20.0.0"
   },
   "scripts": {
-    "dev": "concurrently --kill-others-on-fail \"pnpm --filter client dev\" \"pnpm --filter server dev\"",
-    "build:client": "pnpm --filter client build",
-    "build:server": "pnpm --filter server build",
+    "dev": "concurrently --kill-others-on-fail \"pnpm --filter ./client dev\" \"pnpm --filter ./server dev\"",
+    "build:client": "pnpm --filter ./client build",
+    "build:server": "pnpm --filter ./server build",
     "install:all": "pnpm install"
   },
   "devDependencies": {
