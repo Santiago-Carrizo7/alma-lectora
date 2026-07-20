@@ -37,7 +37,7 @@ export function BookCard({ book, onViewDetail }: BookCardProps) {
   return (
     <div
       onClick={isOutOfStock ? undefined : () => onViewDetail(book)}
-      className={`group relative flex flex-col bg-paper-dark/30 rounded-card overflow-hidden border border-paper-dark transition-all duration-300 ${
+      className={`group relative flex flex-col h-full bg-paper-dark/30 rounded-card overflow-hidden border border-paper-dark transition-all duration-300 ${
         isOutOfStock
           ? 'cursor-default opacity-90'
           : 'hover:border-forest/20 hover:shadow-xl hover:-translate-y-1.5 cursor-pointer'
@@ -80,7 +80,7 @@ export function BookCard({ book, onViewDetail }: BookCardProps) {
       {/* Book details */}
       <div className="flex-1 p-4 flex flex-col justify-between">
         <div>
-          <h3 className={`font-bold text-base text-ink line-clamp-2 leading-snug transition-colors duration-200 ${isOutOfStock ? '' : 'group-hover:text-forest'}`} title={book.title}>
+          <h3 className={`font-bold text-base text-ink line-clamp-2 leading-snug min-h-[2.75rem] transition-colors duration-200 ${isOutOfStock ? '' : 'group-hover:text-forest'}`} title={book.title}>
             {book.title}
           </h3>
           <p className="text-xs text-ink-muted mt-1 italic tracking-wide">

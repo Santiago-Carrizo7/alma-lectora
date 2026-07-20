@@ -243,7 +243,7 @@ function InfiniteBookCarousel({ books, onViewDetail }: { books: Book[]; onViewDe
           style={{ transform: `translateX(${translateX}rem)` }}
         >
           {items.map((book, index) => (
-            <div key={`${book.id}-${index}`} className="w-60 flex-shrink-0">
+            <div key={`${book.id}-${index}`} className="w-60 flex-shrink-0 flex flex-col">
               <BookCard book={book} onViewDetail={onViewDetail} />
             </div>
           ))}
