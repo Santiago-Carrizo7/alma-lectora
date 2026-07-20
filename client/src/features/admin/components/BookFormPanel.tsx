@@ -32,6 +32,10 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
   // Form errors state
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Upload state and ref
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Scanner states
   const [isScanning, setIsScanning] = useState(false);
   const [lookupLoading, setLookupLoading] = useState(false);
@@ -147,6 +151,32 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
       toast.error('Error al buscar metadatos: ' + err.message);
     } finally {
       setLookupLoading(false);
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
+
+    setUploadingImage(true);
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+
+    try {
+      const res = await apiClient.post<{ success: boolean; imageUrl: string }>(
+        '/admin/upload',
+        formData
+      );
+      setCoverUrl(res.imageUrl);
+      toast.success('Imagen de portada subida correctamente.');
+    } catch (err: any) {
+      console.error(err);
+      toast.error('Error al subir la imagen: ' + err.message);
+    } finally {
+      setUploadingImage(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -380,7 +410,7 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
                     <Button
                       type="button"
                       variant="ghost"
-                      disabled={lookupLoading || !isbn || isMutating}
+                      disabled={lookupLoading || !isbn || isMutating || uploadingImage}
                       onClick={() => handleIsbnLookup(isbn)}
                       className="text-xs border border-stone-300 font-semibold px-4"
                     >
@@ -403,7 +433,7 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   onBlur={(e) => validateField('title', e.target.value)}
-                  disabled={isMutating}
+                  disabled={isMutating || uploadingImage}
                   className="w-full bg-paper border border-stone-300 rounded p-2 text-ink text-sm focus:ring-1 focus:ring-forest focus:outline-none font-bold"
                   placeholder="Ej: Pecados 1: Rey de la ira"
                 />
@@ -449,7 +479,7 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
                   name="synopsis"
                   value={synopsis}
                   onChange={(e) => setSynopsis(e.target.value)}
-                  disabled={isMutating}
+                  disabled={isMutating || uploadingImage}
                   rows={3}
                   className="w-full bg-paper border border-stone-300 rounded p-2 text-ink text-sm focus:ring-1 focus:ring-forest focus:outline-none resize-y"
                   placeholder="Escribí una breve descripción del libro..."
@@ -460,16 +490,44 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
                 <label htmlFor="coverUrl" className="block text-xs font-semibold uppercase tracking-wider text-ink mb-1">
                   URL de la Portada (Imagen)
                 </label>
-                <input
-                  id="coverUrl"
-                  name="coverUrl"
-                  type="url"
-                  value={coverUrl}
-                  onChange={(e) => setCoverUrl(e.target.value)}
-                  disabled={isMutating}
-                  className="w-full bg-paper border border-stone-300 rounded p-2 text-ink text-sm focus:ring-1 focus:ring-forest focus:outline-none"
-                  placeholder="https://ejemplo.com/portada.jpg"
-                />
+                <div className="flex gap-2">
+                  <input
+                    id="coverUrl"
+                    name="coverUrl"
+                    type="url"
+                    value={coverUrl}
+                    onChange={(e) => setCoverUrl(e.target.value)}
+                    disabled={isMutating || uploadingImage}
+                    className="flex-1 bg-paper border border-stone-300 rounded p-2 text-ink text-sm focus:ring-1 focus:ring-forest focus:outline-none"
+                    placeholder="https://ejemplo.com/portada.jpg"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={isMutating || uploadingImage}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="text-xs border border-stone-300 font-semibold px-4 flex items-center justify-center gap-1.5 min-w-[120px]"
+                  >
+                    {uploadingImage ? (
+                      <Spinner size="sm" />
+                    ) : (
+                      <>
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+                        </svg>
+                        Subir Archivo
+                      </>
+                    )}
+                  </Button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    disabled={isMutating || uploadingImage}
+                    className="sr-only"
+                  />
+                </div>
               </div>
 
               <div>
@@ -486,7 +544,7 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
                   onBlur={(e) => validateField('price', e.target.value)}
-                  disabled={isMutating}
+                  disabled={isMutating || uploadingImage}
                   className="w-full bg-paper border border-stone-300 rounded p-2 text-ink text-sm focus:ring-1 focus:ring-forest focus:outline-none"
                   placeholder="Ej: 14500.00"
                 />
@@ -506,7 +564,7 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
                   value={stock}
                   onChange={(e) => setStock(e.target.value)}
                   onBlur={(e) => validateField('stock', e.target.value)}
-                  disabled={isMutating}
+                  disabled={isMutating || uploadingImage}
                   className="w-full bg-paper border border-stone-300 rounded p-2 text-ink text-sm focus:ring-1 focus:ring-forest focus:outline-none"
                   placeholder="Ej: 5"
                 />
@@ -523,7 +581,7 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
                   type="text"
                   value={genre}
                   onChange={(e) => setGenre(e.target.value)}
-                  disabled={isMutating}
+                  disabled={isMutating || uploadingImage}
                   className="w-full bg-paper border border-stone-300 rounded p-2 text-ink text-sm focus:ring-1 focus:ring-forest focus:outline-none"
                   placeholder="Ej: Romance Contemporáneo"
                 />
@@ -538,7 +596,7 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
                   name="badge"
                   value={badge}
                   onChange={(e) => setBadge(e.target.value)}
-                  disabled={isMutating}
+                  disabled={isMutating || uploadingImage}
                   className="w-full bg-paper border border-stone-300 rounded p-2 text-ink text-sm focus:ring-1 focus:ring-forest focus:outline-none"
                 >
                   <option value="">Ninguna</option>
@@ -556,7 +614,7 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
                 type="button"
                 variant="ghost"
                 onClick={() => navigate('/admin')}
-                disabled={isMutating}
+                disabled={isMutating || uploadingImage}
                 className="flex-1 py-3 border border-stone-300 font-bold"
               >
                 Cancelar
@@ -564,8 +622,8 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
               <Button
                 type="submit"
                 variant="primary"
-                isLoading={isMutating}
-                disabled={isMutating}
+                isLoading={isMutating || uploadingImage}
+                disabled={isMutating || uploadingImage}
                 className="flex-1 py-3 font-serif text-lg font-bold shadow-md"
               >
                 {mode === 'create' ? 'Guardar Libro' : 'Actualizar Libro'}

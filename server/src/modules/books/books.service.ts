@@ -489,6 +489,35 @@ export class BooksService {
    * If both fail, it returns an empty metadata structure gracefully (Graceful Failure).
    */
   static async lookupBook(isbn: string): Promise<ISBNLookupResult> {
+    try {
+      const localBook = await prisma.book.findUnique({
+        where: { isbn },
+        include: {
+          authors: {
+            include: {
+              author: true,
+            },
+          },
+        },
+      });
+
+      if (localBook) {
+        console.log(`[Lookup:CacheLocal] Libro encontrado localmente para ISBN: ${isbn}`);
+        return {
+          title: localBook.title,
+          originalTitle: localBook.originalTitle,
+          googleBooksId: localBook.googleBooksId,
+          authors: localBook.authors.map((ba) => ba.author.name),
+          synopsis: localBook.synopsis,
+          coverUrl: localBook.coverUrl,
+          publishedDate: localBook.publishedDate,
+          language: localBook.language,
+        };
+      }
+    } catch (error) {
+      console.error(`[Lookup:CacheLocal] Error checking local database for ISBN ${isbn}:`, error);
+    }
+
     let result: ISBNLookupResult | null = null;
 
     // Paso A: Búsqueda estricta en Google Books por ISBN

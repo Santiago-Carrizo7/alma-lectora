@@ -354,7 +354,6 @@ export function ComboFormPanel({ mode }: ComboFormPanelProps) {
                 <input
                   type="file"
                   accept="image/*"
-                  capture="environment"
                   onChange={handleFileChange}
                   disabled={isPending}
                   className="sr-only"

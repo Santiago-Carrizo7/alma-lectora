@@ -223,7 +223,6 @@ export function AccessoryFormPanel({ mode }: AccessoryFormPanelProps) {
                 name="accessoryFile"
                 type="file"
                 accept="image/*"
-                capture="environment"
                 onChange={handleFileChange}
                 disabled={isPending}
                 className="sr-only"
