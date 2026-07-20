@@ -22,3 +22,15 @@ Runtime: Node ESM enabled (MUST use `.js` extensions for local imports).
 - **NO TRY/CATCH**: Express 5 handles async promise rejections natively. Controllers MUST NOT use `try/catch` blocks.
 - **AppError**: Throw `AppError(message, statusCode)` for business or DB errors. Let the global error handler catch it.
 - **Zod Middleware**: NEVER validate manually in Controllers. ALWAYS use `validateSchema(zodSchema)` in `.routes.ts`. Controllers assume `req.body`, `req.query`, and `req.params` are pre-validated and strongly typed.
+  
+## Package Manager
+
+This project exclusively uses pnpm.
+Rules:
+- Never use npm.
+- Never use commands with npm.
+- Always use pnpm.
+- If you need to install dependencies, use `pnpm add`.
+- If you need to install development dependencies, use `pnpm add -D`.
+- To run scripts, use `pnpm dev`, `pnpm build`, `pnpm test`, etc.
+- If the project does not yet have pnpm installed, please indicate this before proceeding.
