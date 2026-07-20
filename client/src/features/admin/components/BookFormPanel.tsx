@@ -490,7 +490,7 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
                 <label htmlFor="coverUrl" className="block text-xs font-semibold uppercase tracking-wider text-ink mb-1">
                   URL de la Portada (Imagen)
                 </label>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <input
                     id="coverUrl"
                     name="coverUrl"
@@ -498,7 +498,7 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
                     value={coverUrl}
                     onChange={(e) => setCoverUrl(e.target.value)}
                     disabled={isMutating || uploadingImage}
-                    className="flex-1 bg-paper border border-stone-300 rounded p-2 text-ink text-sm focus:ring-1 focus:ring-forest focus:outline-none"
+                    className="w-full min-w-0 bg-paper border border-stone-300 rounded p-2 text-ink text-sm focus:ring-1 focus:ring-forest focus:outline-none"
                     placeholder="https://ejemplo.com/portada.jpg"
                   />
                   <Button
@@ -506,7 +506,7 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
                     variant="ghost"
                     disabled={isMutating || uploadingImage}
                     onClick={() => fileInputRef.current?.click()}
-                    className="text-xs border border-stone-300 font-semibold px-4 flex items-center justify-center gap-1.5 min-w-[120px]"
+                    className="w-full sm:w-auto text-xs border border-stone-300 font-semibold px-4 py-2 sm:py-0 flex items-center justify-center gap-1.5 min-w-[120px]"
                   >
                     {uploadingImage ? (
                       <Spinner size="sm" />

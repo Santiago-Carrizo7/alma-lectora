@@ -14,10 +14,14 @@ const upload = multer({
 });
 
 async function injectCoverUrl(req: any, res: any, next: any) {
-  if (req.file?.buffer) {
-    req.body.coverUrl = await AdminService.uploadImage(req.file.buffer);
+  try {
+    if (req.file?.buffer) {
+      req.body.coverUrl = await AdminService.uploadImage(req.file.buffer);
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 }
 
 export const accessoriesRouter: Router = Router();

@@ -30,7 +30,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({}));
-    throw new Error(error?.message ?? `Error HTTP ${res.status}`);
+    throw new Error(error?.error || error?.message || `Error HTTP ${res.status}`);
   }
 
   if (res.status === 204) {
