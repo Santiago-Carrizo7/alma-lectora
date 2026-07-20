@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Html5QrcodeScanner, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { apiClient } from '../../lib/api-client';
 import { Button } from '../../components/ui/Button';
 import { Spinner } from '../../components/ui/Spinner';
@@ -35,7 +35,7 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
   // Scanner states
   const [isScanning, setIsScanning] = useState(false);
   const [lookupLoading, setLookupLoading] = useState(false);
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
 
   // Queries and mutations
   const { data: bookData, isLoading: isBookLoading } = useBookById(id || '');
@@ -152,44 +152,68 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
 
   // HTML5 Barcode scanner lifecycle
   useEffect(() => {
+    let isMounted = true;
+    let isStopping = false;
+
     if (isScanning) {
       const timer = setTimeout(() => {
         try {
-          const scanner = new Html5QrcodeScanner(
-            'reader',
-            {
-              fps: 10,
-              qrbox: { width: 280, height: 160 },
-              formatsToSupport: [Html5QrcodeSupportedFormats.EAN_13],
-            },
-            /* verbose= */ false
-          );
+          const scanner = new Html5Qrcode('reader', {
+            formatsToSupport: [Html5QrcodeSupportedFormats.EAN_13],
+            verbose: false,
+          });
 
-          scanner.render(
-            async (decodedText) => {
-              setIsScanning(false);
-              await scanner.clear();
-              scannerRef.current = null;
-              setIsbn(decodedText);
-              await handleIsbnLookup(decodedText);
-            },
-            () => {
-              // quiet error callback
-            }
-          );
-
-          scannerRef.current = scanner;
+          scanner
+            .start(
+              { facingMode: 'environment' },
+              {
+                fps: 10,
+                qrbox: { width: 280, height: 160 },
+              },
+              async (decodedText) => {
+                if (!isMounted) return;
+                setIsScanning(false);
+                if (scannerRef.current && !isStopping) {
+                  isStopping = true;
+                  try {
+                    await scannerRef.current.stop();
+                  } catch (err) {
+                    console.error('Error stopping scanner', err);
+                  }
+                }
+                scannerRef.current = null;
+                setIsbn(decodedText);
+                await handleIsbnLookup(decodedText);
+              },
+              () => {
+                // quiet error callback
+              }
+            )
+            .then(() => {
+              if (isMounted) {
+                scannerRef.current = scanner;
+              } else {
+                scanner.stop().catch((err) => console.error('Error stopping scanner after unmount', err));
+              }
+            })
+            .catch((err) => {
+              console.error('Error starting html5-qrcode scanner', err);
+              if (isMounted) setIsScanning(false);
+            });
         } catch (err) {
-          console.error('Error starting html5-qrcode scanner', err);
+          console.error('Error initializing html5-qrcode scanner', err);
           setIsScanning(false);
         }
       }, 100);
 
       return () => {
+        isMounted = false;
         clearTimeout(timer);
-        if (scannerRef.current) {
-          scannerRef.current.clear().catch((err) => console.error('Error clearing scanner', err));
+        if (scannerRef.current && !isStopping) {
+          isStopping = true;
+          const currentScanner = scannerRef.current;
           scannerRef.current = null;
+          currentScanner.stop().catch((err) => console.error('Error stopping scanner on cleanup', err));
         }
       };
     }

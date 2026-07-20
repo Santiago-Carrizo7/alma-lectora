@@ -29,7 +29,7 @@ export function useAdminCombos(params: UseAdminCombosParams = {}) {
   return useQuery({
     queryKey: adminCombosKeys.list(params),
     queryFn: () => apiClient.get<CombosListResponse>(`/combos?${qs.toString()}`),
-    staleTime: 0,
+    staleTime: 2 * 60 * 1000,
   });
 }
 
@@ -38,6 +38,6 @@ export function useComboById(id: string) {
     queryKey: adminCombosKeys.detail(id),
     queryFn: () => apiClient.get<Combo>(`/combos/${id}`),
     enabled: !!id,
-    staleTime: 0,
+    staleTime: 2 * 60 * 1000,
   });
 }

@@ -3,8 +3,44 @@ import { Prisma } from '@prisma/client';
 import type { ISBNLookupResult, GetBooksQuery } from './books.schemas.js';
 import { AppError } from '../../utils/AppError.js';
 import { sanitizeGoogleBooksUrl } from '../../utils/image.utils.js';
+import { AdminService } from '../admin/admin.service.js';
 
 export class BooksService {
+  /**
+   * Downloads an external book cover image, processes it to WebP using sharp via AdminService,
+   * and uploads it to Supabase storage. Returns the new Supabase URL, or the original URL on failure.
+   */
+  private static async downloadAndProcessCover(coverUrl: string | null | undefined): Promise<string | null> {
+    if (!coverUrl || coverUrl.trim() === '') {
+      return null;
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+      console.log(`[CoverPipeline] Downloading external cover: ${coverUrl}`);
+      const response = await fetch(coverUrl, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        console.warn(`[CoverPipeline] Failed to download cover. Status: ${response.status}. Falling back to original URL.`);
+        return coverUrl;
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      console.log(`[CoverPipeline] Uploading optimized WebP image via AdminService...`);
+      const optimizedUrl = await AdminService.uploadImage(buffer);
+      console.log(`[CoverPipeline] Image uploaded successfully. Optimized URL: ${optimizedUrl}`);
+      return optimizedUrl;
+    } catch (error) {
+      console.error(`[CoverPipeline] Error processing cover image:`, error);
+      return coverUrl; // Graceful Failure fallback
+    }
+  }
+
   /**
    * Creates a new book in the database.
    * Validates if the book's ISBN already exists.
@@ -13,6 +49,9 @@ export class BooksService {
     const existing = await prisma.book.findUnique({
       where: { isbn: data.isbn },
     });
+    if (!existing && data.coverUrl) {
+      data.coverUrl = await this.downloadAndProcessCover(data.coverUrl);
+    }
     if (existing) {
       if (existing.isActive) {
         throw new AppError('El libro con este ISBN ya está registrado', 400);
@@ -153,6 +192,14 @@ export class BooksService {
     });
     if (!existing) {
       throw new AppError('Libro no encontrado', 404);
+    }
+
+    if (data.coverUrl && data.coverUrl !== existing.coverUrl) {
+      const isAlreadyInSupabase = data.coverUrl.includes('supabase.co') || 
+        (process.env.SUPABASE_URL && data.coverUrl.includes(process.env.SUPABASE_URL));
+      if (!isAlreadyInSupabase) {
+        data.coverUrl = await this.downloadAndProcessCover(data.coverUrl);
+      }
     }
 
     return prisma.$transaction(async (tx) => {
@@ -468,7 +515,7 @@ export class BooksService {
       }
     }
 
-    return result || {
+    const finalResult = result || {
       title: null,
       originalTitle: null,
       googleBooksId: null,
@@ -478,6 +525,9 @@ export class BooksService {
       publishedDate: null,
       language: null,
     };
+
+    console.log(`[Lookup] Final result for ISBN ${isbn}:`, JSON.stringify(finalResult));
+    return finalResult;
   }
 
   /**
@@ -504,8 +554,12 @@ export class BooksService {
   private static async fetchFromGoogleBooksById(id: string): Promise<ISBNLookupResult | null> {
     const fields = 'volumeInfo(title,authors,description,imageLinks,publishedDate,language)';
     const url = `https://www.googleapis.com/books/v1/volumes/${id}?fields=id,${encodeURIComponent(fields)}`;
+    console.log(`[GoogleBooks:ID] GET ${url}`);
     const response = await fetch(url);
+    console.log(`[GoogleBooks:ID] Response status: ${response.status}`);
     if (!response.ok) {
+      const errText = await response.text();
+      console.error(`[GoogleBooks:ID] Non-OK response: ${response.status} - ${errText.slice(0, 200)}`);
       return null;
     }
 
@@ -564,8 +618,12 @@ export class BooksService {
   private static async fetchFromGoogleBooksBySearch(query: string): Promise<ISBNLookupResult | null> {
     const fields = encodeURIComponent('items(id,volumeInfo(title,authors,description,imageLinks,publishedDate,language))');
     const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=1&fields=${fields}`;
+    console.log(`[GoogleBooks:Search] GET ${url}`);
     const response = await fetch(url);
+    console.log(`[GoogleBooks:Search] Response status: ${response.status}`);
     if (!response.ok) {
+      const errText = await response.text();
+      console.error(`[GoogleBooks:Search] Non-OK response: ${response.status} - ${errText.slice(0, 200)}`);
       return null;
     }
 
@@ -590,6 +648,7 @@ export class BooksService {
     };
 
     if (!data.items || data.items.length === 0) {
+      console.warn(`[GoogleBooks:Search] No items found for query: ${query}`);
       return null;
     }
 
@@ -688,8 +747,12 @@ export class BooksService {
   private static async fetchFromGoogleBooks(isbn: string): Promise<ISBNLookupResult | null> {
     const fields = encodeURIComponent('items(id,volumeInfo(title,authors,description,imageLinks,publishedDate,language))');
     const url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&fields=${fields}`;
+    console.log(`[GoogleBooks:ISBN] GET ${url}`);
     const response = await fetch(url);
+    console.log(`[GoogleBooks:ISBN] Response status: ${response.status}`);
     if (!response.ok) {
+      const errText = await response.text();
+      console.error(`[GoogleBooks:ISBN] Non-OK response: ${response.status} - ${errText.slice(0, 200)}`);
       return null;
     }
 
@@ -715,6 +778,7 @@ export class BooksService {
     };
 
     if (!data.items || data.items.length === 0) {
+      console.warn(`[GoogleBooks:ISBN] No items found for ISBN: ${isbn}`);
       return null;
     }
 
@@ -759,8 +823,12 @@ export class BooksService {
    */
   private static async fetchFromOpenLibrary(isbn: string): Promise<ISBNLookupResult | null> {
     const url = `https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`;
+    console.log(`[OpenLibrary] GET ${url}`);
     const response = await fetch(url);
+    console.log(`[OpenLibrary] Response status: ${response.status}`);
     if (!response.ok) {
+      const errText = await response.text();
+      console.error(`[OpenLibrary] Non-OK response: ${response.status} - ${errText.slice(0, 200)}`);
       return null;
     }
 
@@ -781,6 +849,7 @@ export class BooksService {
     const keys = Object.keys(data);
     const targetKey = keys.find(k => k.toLowerCase() === `isbn:${isbn.toLowerCase()}`);
     if (!targetKey) {
+      console.warn(`[OpenLibrary] ISBN ${isbn} not found in response keys: ${keys.join(', ')}`);
       return null;
     }
 

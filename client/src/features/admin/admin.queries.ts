@@ -29,7 +29,7 @@ export function useAdminBooks(params: UseAdminBooksParams = {}) {
   return useQuery({
     queryKey: adminBooksKeys.list(params),
     queryFn: () => apiClient.get<BooksListResponse>(`/books?${qs.toString()}`),
-    staleTime: 0,
+    staleTime: 2 * 60 * 1000,
   });
 }
 
@@ -38,6 +38,6 @@ export function useBookById(id: string) {
     queryKey: adminBooksKeys.detail(id),
     queryFn: () => apiClient.get<Book>(`/books/${id}`),
     enabled: !!id,
-    staleTime: 0,
+    staleTime: 2 * 60 * 1000,
   });
 }

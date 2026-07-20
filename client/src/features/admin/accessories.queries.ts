@@ -31,7 +31,7 @@ export function useAdminAccessories(params: UseAdminAccessoriesParams = {}) {
   return useQuery({
     queryKey: adminAccessoriesKeys.list(params),
     queryFn: () => apiClient.get<AccessoriesListResponse>(`/accessories?${qs.toString()}`),
-    staleTime: 0,
+    staleTime: 2 * 60 * 1000,
   });
 }
 
@@ -40,6 +40,6 @@ export function useAccessoryById(id: string) {
     queryKey: adminAccessoriesKeys.detail(id),
     queryFn: () => apiClient.get<Accessory>(`/accessories/${id}`),
     enabled: !!id,
-    staleTime: 0,
+    staleTime: 2 * 60 * 1000,
   });
 }
