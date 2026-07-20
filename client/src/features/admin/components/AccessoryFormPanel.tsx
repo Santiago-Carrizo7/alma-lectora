@@ -6,6 +6,7 @@ import { useAccessoryById } from '../hooks/accessories.queries';
 import { useCreateAccessory, useUpdateAccessory } from '../hooks/accessories.mutations';
 import type { AccessoryCategory } from '../../../types/api';
 import { useToast } from '../../../components/ui/Toast';
+import { compressImage } from '../../../services/image-compressor';
 
 interface AccessoryFormPanelProps {
   mode: 'create' | 'edit';
@@ -102,15 +103,21 @@ export function AccessoryFormPanel({ mode }: AccessoryFormPanelProps) {
     };
   }, [previewUrl]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0] || null;
     if (selectedFile) {
-      setFile(selectedFile);
-      // Revoke old blob url if it existed
-      if (previewUrl && previewUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(previewUrl);
+      try {
+        const optimizedFile = await compressImage(selectedFile);
+        setFile(optimizedFile);
+        // Revoke old blob url if it existed
+        if (previewUrl && previewUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(previewUrl);
+        }
+        setPreviewUrl(URL.createObjectURL(optimizedFile));
+      } catch (err: any) {
+        console.error('Error compressing image:', err);
+        toast.error('Error al procesar la imagen: ' + err.message);
       }
-      setPreviewUrl(URL.createObjectURL(selectedFile));
     }
   };
 

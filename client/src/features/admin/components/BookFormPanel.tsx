@@ -7,6 +7,7 @@ import { Spinner } from '../../../components/ui/Spinner';
 import { useBookById } from '../hooks/admin.queries';
 import { useCreateBook, useUpdateBook } from '../hooks/admin.mutations';
 import { useToast } from '../../../components/ui/Toast';
+import { compressImage } from '../../../services/image-compressor';
 
 interface BookFormPanelProps {
   mode: 'create' | 'edit';
@@ -159,10 +160,11 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
     if (!selectedFile) return;
 
     setUploadingImage(true);
-    const formData = new FormData();
-    formData.append('file', selectedFile);
-
     try {
+      const optimizedFile = await compressImage(selectedFile);
+      const formData = new FormData();
+      formData.append('file', optimizedFile);
+
       const res = await apiClient.post<{ success: boolean; imageUrl: string }>(
         '/admin/upload',
         formData

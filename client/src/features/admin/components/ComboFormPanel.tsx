@@ -11,6 +11,7 @@ import { formatPrice } from '../../../services/price';
 import { BookThumbnail } from '../../../components/ui/BookThumbnail';
 import type { AccessoryCategory } from '../../../types/api';
 import { useToast } from '../../../components/ui/Toast';
+import { compressImage } from '../../../services/image-compressor';
 
 const categoryLabels: Record<AccessoryCategory, string> = {
   VELAS: 'Velas',
@@ -147,14 +148,20 @@ export function ComboFormPanel({ mode }: ComboFormPanelProps) {
     };
   }, [previewUrl]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0] || null;
     if (selectedFile) {
-      setFile(selectedFile);
-      if (previewUrl && previewUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(previewUrl);
+      try {
+        const optimizedFile = await compressImage(selectedFile);
+        setFile(optimizedFile);
+        if (previewUrl && previewUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(previewUrl);
+        }
+        setPreviewUrl(URL.createObjectURL(optimizedFile));
+      } catch (err: any) {
+        console.error('Error compressing image:', err);
+        toast.error('Error al procesar la imagen: ' + err.message);
       }
-      setPreviewUrl(URL.createObjectURL(selectedFile));
     }
   };
 
