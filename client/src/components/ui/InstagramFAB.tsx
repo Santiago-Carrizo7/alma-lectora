@@ -1,4 +1,4 @@
-import { useStoreConfig } from '../../features/admin/config.queries';
+import { useStoreConfig } from '../../features/admin/hooks/config.queries';
 
 const FALLBACK_IG = 'https://www.instagram.com/alma.lectora.al/?hl=es-la';
 

@@ -3,7 +3,7 @@ import { useCart } from '../../hooks/useCart';
 import { Drawer } from '../../components/ui/Drawer';
 import { CartItem } from './CartItem';
 import { Button } from '../../components/ui/Button';
-import { formatPrice } from '../../lib/price';
+import { formatPrice } from '../../services/price';
 
 export function CartDrawer() {
   const { items, isOpen, closeCart, totalItems, totalAmount } = useCart();

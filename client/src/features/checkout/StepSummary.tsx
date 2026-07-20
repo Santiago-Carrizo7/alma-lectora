@@ -2,7 +2,7 @@
 import type { ShippingFormData, CustomerFormData } from '../../types/api';
 import { useCart } from '../../hooks/useCart';
 import { Button } from '../../components/ui/Button';
-import { formatPrice } from '../../lib/price';
+import { formatPrice } from '../../services/price';
 
 interface StepSummaryProps {
   shipping: ShippingFormData;

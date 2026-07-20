@@ -2,24 +2,24 @@ import { Routes, Route } from 'react-router-dom';
 import { Header } from './components/layout/Header';
 import { PageShell } from './components/layout/PageShell';
 import { CartDrawer } from './features/cart/CartDrawer';
-import { HomePage } from './pages/HomePage';
-import { BooksPage } from './pages/BooksPage';
-import { AccessoriesPage } from './pages/AccessoriesPage';
-import Checkout from './pages/CheckoutPage';
-import { ProtectedRoute } from './components/router/ProtectedRoute';
-import { AdminLayout } from './features/admin/AdminLayout';
-import { AdminHub } from './features/admin/AdminHub';
-import { BookManagementTable } from './features/admin/BookManagementTable';
-import { BookFormPanel } from './features/admin/BookFormPanel';
-import { AccessoryManagementTable } from './features/admin/AccessoryManagementTable';
-import { AccessoryFormPanel } from './features/admin/AccessoryFormPanel';
-import { ComboManagementTable } from './features/admin/ComboManagementTable';
-import { ComboFormPanel } from './features/admin/ComboFormPanel';
-import { LoginPage } from './pages/LoginPage';
+import { HomePage } from './features/catalog/pages/HomePage';
+import { BooksPage } from './features/catalog/pages/BooksPage';
+import { AccessoriesPage } from './features/catalog/pages/AccessoriesPage';
+import { CheckoutPage } from './features/checkout/CheckoutPage';
+import { ProtectedRoute } from './routes/ProtectedRoute';
+import { AdminLayout } from './features/admin/pages/AdminLayout';
+import { AdminHub } from './features/admin/pages/AdminHub';
+import { BookManagementTable } from './features/admin/components/BookManagementTable';
+import { BookFormPanel } from './features/admin/components/BookFormPanel';
+import { AccessoryManagementTable } from './features/admin/components/AccessoryManagementTable';
+import { AccessoryFormPanel } from './features/admin/components/AccessoryFormPanel';
+import { ComboManagementTable } from './features/admin/components/ComboManagementTable';
+import { ComboFormPanel } from './features/admin/components/ComboFormPanel';
+import { LoginPage } from './features/auth/pages/LoginPage';
 import { InstagramFAB } from './components/ui/InstagramFAB';
-import { StoreConfigPanel } from './features/admin/StoreConfigPanel';
+import { StoreConfigPanel } from './features/admin/components/StoreConfigPanel';
 import { ToastProvider } from './components/ui/Toast';
-import { OrderManagementTable } from './features/admin/OrderManagementTable';
+import { OrderManagementTable } from './features/admin/components/OrderManagementTable';
 
 export default function App() {
   return (
@@ -32,7 +32,7 @@ export default function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/libros" element={<BooksPage />} />
           <Route path="/accesorios" element={<AccessoriesPage />} />
-          <Route path="/checkout" element={<Checkout />} />
+          <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="/login" element={<LoginPage />} />
           
           {/* Rutas administrativas protegidas */}

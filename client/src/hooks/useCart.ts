@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useCartStore } from '../store/cart.store';
+import { useCartStore } from '../context/cart.store';
 
 export function useCart() {
   const items = useCartStore((state) => state.items);

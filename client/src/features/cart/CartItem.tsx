@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import type { CartItem as CartItemType } from '../../types/api.js';
-import { useCart } from '../../hooks/useCart.js';
-import { formatPrice } from '../../lib/price.js';
+import type { CartItem as CartItemType } from '../../types/api';
+import { useCart } from '../../hooks/useCart';
+import { formatPrice } from '../../services/price';
 
 interface CartItemProps {
   item: CartItemType;

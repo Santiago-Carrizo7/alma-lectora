@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCart } from '../../hooks/useCart';
-import { apiClient } from '../../lib/api-client';
+import { apiClient } from '../../services/api-client';
 
 interface UserProfile {
   id: string;

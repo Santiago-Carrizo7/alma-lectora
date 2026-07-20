@@ -6,8 +6,8 @@ import { StepShipping } from './StepShipping';
 import { StepCustomer } from './StepCustomer';
 import { StepSummary } from './StepSummary';
 import { useCreateOrderLead } from './checkout.mutations';
-import { buildWhatsAppUrl } from '../../lib/whatsapp';
-import { useStoreConfig } from '../admin/config.queries';
+import { buildWhatsAppUrl } from '../../services/whatsapp';
+import { useStoreConfig } from '../admin/hooks/config.queries';
 import type { ShippingFormData, CustomerFormData, CreateOrderLeadPayload } from '../../types/api';
 
 type CheckoutStep = 0 | 1 | 2;
