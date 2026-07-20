@@ -491,21 +491,25 @@ export class BooksService {
   static async lookupBook(isbn: string): Promise<ISBNLookupResult> {
     let result: ISBNLookupResult | null = null;
 
+    // Paso A: Búsqueda estricta en Google Books por ISBN
     try {
       result = await this.fetchFromGoogleBooks(isbn);
     } catch (error) {
       console.error(`[Lookup] Google Books API lookup failed for ISBN ${isbn}:`, error);
     }
 
-    if (!result || !result.coverUrl) {
+    // Paso B: Si result es null, o si title o coverUrl son null, intentar Open Library
+    if (!result || !result.title || !result.coverUrl) {
       try {
         const openLibraryResult = await this.fetchFromOpenLibrary(isbn);
         if (openLibraryResult) {
           if (result) {
-            result.coverUrl = openLibraryResult.coverUrl;
-            if (!result.synopsis) {
-              result.synopsis = openLibraryResult.synopsis;
-            }
+            if (!result.title) result.title = openLibraryResult.title;
+            if (!result.originalTitle) result.originalTitle = openLibraryResult.originalTitle;
+            if (!result.coverUrl) result.coverUrl = openLibraryResult.coverUrl;
+            if (!result.synopsis) result.synopsis = openLibraryResult.synopsis;
+            if (result.authors.length === 0) result.authors = openLibraryResult.authors;
+            if (!result.publishedDate) result.publishedDate = openLibraryResult.publishedDate;
           } else {
             result = openLibraryResult;
           }
@@ -515,7 +519,36 @@ export class BooksService {
       }
     }
 
-    const finalResult = result || {
+    // Paso C: Rescate Semántico si result o result.title sigue siendo null
+    if (!result || !result.title) {
+      try {
+        console.log(`[Lookup] Strict lookup failed for ISBN ${isbn}. Initiating semantic search fallback...`);
+        const semanticResult = await this.fetchFromGoogleBooksBySearch(isbn);
+        if (semanticResult) {
+          if (result) {
+            result = {
+              ...result,
+              ...semanticResult,
+              title: semanticResult.title || result.title,
+              originalTitle: semanticResult.originalTitle || result.originalTitle,
+              googleBooksId: semanticResult.googleBooksId || result.googleBooksId,
+              authors: semanticResult.authors.length > 0 ? semanticResult.authors : result.authors,
+              synopsis: semanticResult.synopsis || result.synopsis,
+              coverUrl: semanticResult.coverUrl || result.coverUrl,
+              publishedDate: semanticResult.publishedDate || result.publishedDate,
+              language: semanticResult.language || result.language,
+            };
+          } else {
+            result = semanticResult;
+          }
+        }
+      } catch (error) {
+        console.error(`[Lookup] Semantic search fallback failed for ISBN ${isbn}:`, error);
+      }
+    }
+
+    // Paso D: Asegurar estructura base y log final
+    const finalResult: ISBNLookupResult = result || {
       title: null,
       originalTitle: null,
       googleBooksId: null,
@@ -553,7 +586,9 @@ export class BooksService {
    */
   private static async fetchFromGoogleBooksById(id: string): Promise<ISBNLookupResult | null> {
     const fields = 'volumeInfo(title,authors,description,imageLinks,publishedDate,language)';
-    const url = `https://www.googleapis.com/books/v1/volumes/${id}?fields=id,${encodeURIComponent(fields)}`;
+    const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
+    const keyParam = apiKey ? `&key=${apiKey}` : '';
+    const url = `https://www.googleapis.com/books/v1/volumes/${id}?fields=id,${encodeURIComponent(fields)}${keyParam}`;
     console.log(`[GoogleBooks:ID] GET ${url}`);
     const response = await fetch(url);
     console.log(`[GoogleBooks:ID] Response status: ${response.status}`);
@@ -586,28 +621,29 @@ export class BooksService {
       return null;
     }
 
+    const imageLinks = info.imageLinks ?? {};
     const rawCover =
-      info.imageLinks?.extraLarge ??
-      info.imageLinks?.large ??
-      info.imageLinks?.medium ??
-      info.imageLinks?.small ??
-      info.imageLinks?.thumbnail ??
+      imageLinks.extraLarge ??
+      imageLinks.large ??
+      imageLinks.medium ??
+      imageLinks.small ??
+      imageLinks.thumbnail ??
       null;
 
-    const rawSynopsis = info.description || null;
-    const lang = info.language || null;
+    const rawSynopsis = info.description ?? null;
+    const lang = info.language ?? null;
     const synopsis = rawSynopsis && lang && lang !== 'es'
       ? await this.translateSynopsis(rawSynopsis, lang)
       : rawSynopsis;
 
     return {
-      title: info.title || null,
-      originalTitle: info.title || null,
-      googleBooksId: item.id || null,
-      authors: info.authors || [],
+      title: info.title ?? null,
+      originalTitle: info.title ?? null,
+      googleBooksId: item.id ?? null,
+      authors: info.authors ?? [],
       synopsis,
       coverUrl: sanitizeGoogleBooksUrl(rawCover),
-      publishedDate: info.publishedDate || null,
+      publishedDate: info.publishedDate ?? null,
       language: lang,
     };
   }
@@ -617,7 +653,9 @@ export class BooksService {
    */
   private static async fetchFromGoogleBooksBySearch(query: string): Promise<ISBNLookupResult | null> {
     const fields = encodeURIComponent('items(id,volumeInfo(title,authors,description,imageLinks,publishedDate,language))');
-    const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=1&fields=${fields}`;
+    const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
+    const keyParam = apiKey ? `&key=${apiKey}` : '';
+    const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=1&fields=${fields}${keyParam}`;
     console.log(`[GoogleBooks:Search] GET ${url}`);
     const response = await fetch(url);
     console.log(`[GoogleBooks:Search] Response status: ${response.status}`);
@@ -662,28 +700,29 @@ export class BooksService {
       return null;
     }
 
+    const imageLinks = info.imageLinks ?? {};
     const rawCover =
-      info.imageLinks?.extraLarge ??
-      info.imageLinks?.large ??
-      info.imageLinks?.medium ??
-      info.imageLinks?.small ??
-      info.imageLinks?.thumbnail ??
+      imageLinks.extraLarge ??
+      imageLinks.large ??
+      imageLinks.medium ??
+      imageLinks.small ??
+      imageLinks.thumbnail ??
       null;
 
-    const rawSynopsis = info.description || null;
-    const lang = info.language || null;
+    const rawSynopsis = info.description ?? null;
+    const lang = info.language ?? null;
     const synopsis = rawSynopsis && lang && lang !== 'es'
       ? await this.translateSynopsis(rawSynopsis, lang)
       : rawSynopsis;
 
     return {
-      title: info.title || null,
-      originalTitle: info.title || null,
-      googleBooksId: firstItem.id || null,
-      authors: info.authors || [],
+      title: info.title ?? null,
+      originalTitle: info.title ?? null,
+      googleBooksId: firstItem.id ?? null,
+      authors: info.authors ?? [],
       synopsis,
       coverUrl: sanitizeGoogleBooksUrl(rawCover),
-      publishedDate: info.publishedDate || null,
+      publishedDate: info.publishedDate ?? null,
       language: lang,
     };
   }
@@ -746,7 +785,9 @@ export class BooksService {
    */
   private static async fetchFromGoogleBooks(isbn: string): Promise<ISBNLookupResult | null> {
     const fields = encodeURIComponent('items(id,volumeInfo(title,authors,description,imageLinks,publishedDate,language))');
-    const url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&fields=${fields}`;
+    const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
+    const keyParam = apiKey ? `&key=${apiKey}` : '';
+    const url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&fields=${fields}${keyParam}`;
     console.log(`[GoogleBooks:ISBN] GET ${url}`);
     const response = await fetch(url);
     console.log(`[GoogleBooks:ISBN] Response status: ${response.status}`);
@@ -792,28 +833,29 @@ export class BooksService {
       return null;
     }
 
+    const imageLinks = info.imageLinks ?? {};
     const rawCover =
-      info.imageLinks?.extraLarge ??
-      info.imageLinks?.large ??
-      info.imageLinks?.medium ??
-      info.imageLinks?.small ??
-      info.imageLinks?.thumbnail ??
+      imageLinks.extraLarge ??
+      imageLinks.large ??
+      imageLinks.medium ??
+      imageLinks.small ??
+      imageLinks.thumbnail ??
       null;
 
-    const rawSynopsis = info.description || null;
-    const lang = info.language || null;
+    const rawSynopsis = info.description ?? null;
+    const lang = info.language ?? null;
     const synopsis = rawSynopsis && lang && lang !== 'es'
       ? await this.translateSynopsis(rawSynopsis, lang)
       : rawSynopsis;
 
     return {
-      title: info.title || null,
-      originalTitle: info.title || null,
-      googleBooksId: firstItem.id || null,
-      authors: info.authors || [],
+      title: info.title ?? null,
+      originalTitle: info.title ?? null,
+      googleBooksId: firstItem.id ?? null,
+      authors: info.authors ?? [],
       synopsis,
       coverUrl: sanitizeGoogleBooksUrl(rawCover),
-      publishedDate: info.publishedDate || null,
+      publishedDate: info.publishedDate ?? null,
       language: lang,
     };
   }
