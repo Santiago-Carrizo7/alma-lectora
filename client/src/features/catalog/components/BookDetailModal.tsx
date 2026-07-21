@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import type { Book } from '../../../types/api';
 import { Modal } from '../../../components/ui/Modal';
@@ -15,10 +14,12 @@ interface BookDetailModalProps {
 export function BookDetailModal({ book, onClose }: BookDetailModalProps) {
   const { addItem } = useCart();
   const [hasError, setHasError] = useState(false);
+  const [addedToast, setAddedToast] = useState(false);
 
   useEffect(() => {
     if (book) {
       setHasError(false);
+      setAddedToast(false);
     }
   }, [book?.id]);
 
@@ -41,14 +42,16 @@ export function BookDetailModal({ book, onClose }: BookDetailModalProps) {
       price: book.price,
       stock: book.stock,
     });
+    setAddedToast(true);
+    setTimeout(() => setAddedToast(false), 2000);
   };
 
   return (
-    <Modal isOpen={!!book} onClose={onClose} title="Detalle del Libro">
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6 md:gap-8">
-        {/* Cover */}
+    <Modal isOpen={!!book} onClose={onClose} title="Detalle del Libro" maxWidth="max-w-3xl">
+      <div className="flex flex-col md:grid md:grid-cols-5 gap-6 md:gap-8">
+        {/* Cover Image Column */}
         <div className="md:col-span-2 flex justify-center items-start">
-          <div className="relative w-48 sm:w-full aspect-3/4 rounded-card overflow-hidden shadow-lg border border-paper-dark bg-paper-dark">
+          <div className="relative w-40 sm:w-48 md:w-full aspect-3/4 rounded-card overflow-hidden shadow-lg border border-paper-dark bg-paper-dark shrink-0">
             {book.coverUrl && !hasError ? (
               <img
                 src={book.coverUrl}
@@ -77,23 +80,23 @@ export function BookDetailModal({ book, onClose }: BookDetailModalProps) {
           </div>
         </div>
 
-        {/* Content details */}
-        <div className="md:col-span-3 flex flex-col justify-between">
+        {/* Content details Column */}
+        <div className="md:col-span-3 flex flex-col justify-between space-y-6">
           <div>
-            <h2 className="text-2xl md:text-3xl font-bold font-serif text-ink tracking-tight leading-tight">
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold font-serif text-ink tracking-tight leading-tight">
               {book.title}
             </h2>
-            <p className="text-base text-forest font-semibold mt-1.5">
+            <p className="text-sm sm:text-base text-forest font-semibold mt-1.5">
               {book.authors && book.authors.length > 0
                 ? book.authors.map((a) => a.name).join(', ')
                 : 'Autor Desconocido'}
             </p>
             <p className="text-xs text-stone-500 font-mono mt-0.5">ISBN: {book.isbn}</p>
 
-            <div className="mt-6 border-t border-paper-dark pt-4">
-              <h4 className="text-sm font-semibold uppercase tracking-wider text-ink-muted mb-2">Sinopsis</h4>
+            <div className="mt-4 sm:mt-6 border-t border-paper-dark pt-4">
+              <h4 className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-ink-muted mb-2">Sinopsis</h4>
               {book.synopsis ? (
-                <p className="text-sm text-stone-700 leading-relaxed font-sans whitespace-pre-line">
+                <p className="text-sm sm:text-base text-stone-700 leading-relaxed font-sans whitespace-pre-line">
                   {book.synopsis}
                 </p>
               ) : (
@@ -102,20 +105,22 @@ export function BookDetailModal({ book, onClose }: BookDetailModalProps) {
             </div>
           </div>
 
-          <div className="mt-8 border-t border-paper-dark pt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="border-t border-paper-dark pt-4 sm:pt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex flex-col">
-              <span className="text-xs text-stone-500 uppercase tracking-wider">Precio</span>
-              <span className="text-3xl font-extrabold text-amber font-mono mt-0.5">{formatPrice(book.price)}</span>
+              <span className="text-xs text-stone-500 uppercase tracking-wider font-semibold">Precio</span>
+              <span className="text-2xl sm:text-3xl font-extrabold text-amber font-mono mt-0.5">{formatPrice(book.price)}</span>
             </div>
 
             <Button
               size="lg"
               onClick={handleAddToCart}
               disabled={isOutOfStock}
-              className="w-full sm:w-auto font-semibold flex items-center justify-center gap-2"
+              className="w-full sm:w-auto font-semibold flex items-center justify-center gap-2 py-3 px-6 cursor-pointer"
             >
               {isOutOfStock ? (
                 'Producto Agotado'
+              ) : addedToast ? (
+                '¡Agregado al Carrito! ✓'
               ) : (
                 <>
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
