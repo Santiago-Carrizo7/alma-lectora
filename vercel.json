@@ -7,7 +7,7 @@
   "routes": [
     { "src": "/api/v1/(.*)", "dest": "server/src/app.ts" },
     { "src": "/assets/(.*)", "dest": "client/assets/$1" },
-    { "src": "/(.*)\\.(js|css|png|jpg|jpeg|gif|ico|svg|webp|json|txt|map|webmanifest)", "dest": "client/$1" },
+    { "src": "/([^/]+\\.(?:js|css|png|jpg|jpeg|gif|ico|svg|webp|json|txt|map|webmanifest))", "dest": "client/$1" },
     { "src": "/(.*)", "dest": "client/index.html" }
   ]
 }
