@@ -194,15 +194,21 @@ export class BooksService {
       throw new AppError('Libro no encontrado', 404);
     }
 
-    if (data.coverUrl && data.coverUrl !== existing.coverUrl) {
-      const isAlreadyInSupabase = data.coverUrl.includes('supabase.co') || 
-        (process.env.SUPABASE_URL && data.coverUrl.includes(process.env.SUPABASE_URL));
-      if (!isAlreadyInSupabase) {
-        data.coverUrl = await this.downloadAndProcessCover(data.coverUrl);
+    const oldCoverUrl = existing.coverUrl;
+    let coverChanged = false;
+
+    if (data.coverUrl !== undefined && data.coverUrl !== oldCoverUrl) {
+      coverChanged = true;
+      if (data.coverUrl) {
+        const isAlreadyInSupabase = data.coverUrl.includes('supabase.co') || 
+          (process.env.SUPABASE_URL && data.coverUrl.includes(process.env.SUPABASE_URL));
+        if (!isAlreadyInSupabase) {
+          data.coverUrl = await this.downloadAndProcessCover(data.coverUrl);
+        }
       }
     }
 
-    return prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       // If authors is present, update BookAuthor relationships
       if (data.authors && Array.isArray(data.authors)) {
         // Delete existing relations
@@ -253,6 +259,14 @@ export class BooksService {
         authors: updatedBook.authors.map((ba) => ba.author),
       };
     });
+
+    if (coverChanged && oldCoverUrl) {
+      AdminService.deleteImage(oldCoverUrl).catch((err) => {
+        console.error('[BooksService:updateBook:deleteImage:Error]', err);
+      });
+    }
+
+    return result;
   }
 
   /**

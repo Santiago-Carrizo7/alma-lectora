@@ -1,5 +1,6 @@
 import { prisma } from '../../config/db.js';
 import type { GetAccessoriesQuery, CreateAccessoryInput, UpdateAccessoryInput } from './accessories.schemas.js';
+import { AdminService } from '../admin/admin.service.js';
 
 export class AccessoriesService {
   static async getAccessories(query: GetAccessoriesQuery) {
@@ -55,13 +56,26 @@ export class AccessoriesService {
   }
 
   static async updateAccessory(id: string, data: UpdateAccessoryInput) {
-    return prisma.accessory.update({
+    const existing = await prisma.accessory.findUnique({
+      where: { id },
+    });
+    const oldCoverUrl = existing?.coverUrl;
+
+    const result = await prisma.accessory.update({
       where: { id },
       data: {
         ...data,
         price: data.price !== undefined ? (data.price.toString() as any) : undefined,
       },
     });
+
+    if (data.coverUrl !== undefined && data.coverUrl !== oldCoverUrl && oldCoverUrl) {
+      AdminService.deleteImage(oldCoverUrl).catch((err) => {
+        console.error('[AccessoriesService:updateAccessory:deleteImage:Error]', err);
+      });
+    }
+
+    return result;
   }
 
   static async deleteAccessory(id: string) {

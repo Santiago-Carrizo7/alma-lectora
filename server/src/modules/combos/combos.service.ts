@@ -1,5 +1,6 @@
 import { prisma } from '../../config/db.js';
 import type { GetCombosQuery, CreateComboInput, UpdateComboInput } from './combos.schemas.js';
+import { AdminService } from '../admin/admin.service.js';
 
 export class CombosService {
   static async getCombos(query: GetCombosQuery) {
@@ -109,7 +110,12 @@ export class CombosService {
   static async updateCombo(id: string, data: UpdateComboInput) {
     const { books, accessories, ...comboData } = data;
 
-    return prisma.$transaction(async (tx) => {
+    const existing = await prisma.combo.findUnique({
+      where: { id },
+    });
+    const oldCoverUrl = existing?.coverUrl;
+
+    const result = await prisma.$transaction(async (tx) => {
       await tx.combo.update({
         where: { id },
         data: {
@@ -158,6 +164,14 @@ export class CombosService {
         },
       });
     });
+
+    if (data.coverUrl !== undefined && data.coverUrl !== oldCoverUrl && oldCoverUrl) {
+      AdminService.deleteImage(oldCoverUrl).catch((err) => {
+        console.error('[CombosService:updateCombo:deleteImage:Error]', err);
+      });
+    }
+
+    return result;
   }
 
   static async deleteCombo(id: string) {

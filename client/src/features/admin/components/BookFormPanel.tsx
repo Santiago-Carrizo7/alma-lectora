@@ -30,6 +30,10 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
   const [badge, setBadge] = useState('');
   const [genre, setGenre] = useState('');
 
+  // Local file and preview states
+  const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
   // Form errors state
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -103,6 +107,7 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
       setAuthors(bookData.authors ? bookData.authors.map((a) => a.name) : []);
       setSynopsis(bookData.synopsis || '');
       setCoverUrl(bookData.coverUrl || '');
+      setPreviewUrl(bookData.coverUrl || null);
       setPrice(bookData.price ? String(bookData.price) : '');
       setStock(bookData.stock !== undefined ? String(bookData.stock) : '0');
       setBadge(bookData.badge || '');
@@ -115,12 +120,32 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
       setAuthors([]);
       setSynopsis('');
       setCoverUrl('');
+      setPreviewUrl(null);
+      setFile(null);
       setPrice('');
       setStock('');
       setBadge('');
       setGenre('');
     }
   }, [mode, bookData]);
+
+  // Cleanup object URL on unmount to prevent leaks
+  useEffect(() => {
+    return () => {
+      if (previewUrl && previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
+  // Handler for text input change of coverUrl
+  const handleCoverUrlChange = (value: string) => {
+    setCoverUrl(value);
+    setPreviewUrl(value || null);
+    if (file) {
+      setFile(null);
+    }
+  };
 
   // Auto-fill from ISBN lookup
   const handleIsbnLookup = async (lookupIsbn: string) => {
@@ -143,6 +168,8 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
         setAuthors(data.authors || []);
         setSynopsis(data.synopsis || '');
         setCoverUrl(data.coverUrl || '');
+        setPreviewUrl(data.coverUrl || null);
+        setFile(null); // Clear local preview since we're using external data
         toast.success('Metadatos autocompletados desde el ISBN exitosamente.');
       } else {
         toast.error('No se encontraron metadatos para este ISBN. Por favor ingresá los datos manualmente.');
@@ -156,28 +183,23 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (!selectedFile) return;
-
-    setUploadingImage(true);
-    try {
-      const optimizedFile = await compressImage(selectedFile);
-      const formData = new FormData();
-      formData.append('file', optimizedFile);
-
-      const res = await apiClient.post<{ success: boolean; imageUrl: string }>(
-        '/admin/upload',
-        formData
-      );
-      setCoverUrl(res.imageUrl);
-      toast.success('Imagen de portada subida correctamente.');
-    } catch (err: any) {
-      console.error(err);
-      toast.error('Error al subir la imagen: ' + err.message);
-    } finally {
-      setUploadingImage(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+    const selectedFile = e.target.files?.[0] || null;
+    if (selectedFile) {
+      try {
+        const optimizedFile = await compressImage(selectedFile);
+        setFile(optimizedFile);
+        if (previewUrl && previewUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(previewUrl);
+        }
+        setPreviewUrl(URL.createObjectURL(optimizedFile));
+        toast.success('Imagen de portada seleccionada y optimizada localmente.');
+      } catch (err: any) {
+        console.error('Error compressing image:', err);
+        toast.error('Error al procesar la imagen: ' + err.message);
+      } finally {
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
       }
     }
   };
@@ -251,7 +273,7 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
     }
   }, [isScanning]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validar todos los campos antes del submit
@@ -265,44 +287,66 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
       return;
     }
 
-    const payload = {
-      isbn,
-      title,
-      originalTitle: originalTitle || null,
-      googleBooksId: googleBooksId || null,
-      authors,
-      synopsis: synopsis || null,
-      coverUrl: coverUrl || null,
-      price: parseFloat(price),
-      stock: parseInt(stock, 10),
-      badge: badge || null,
-      genre: genre || null,
-    };
+    setUploadingImage(true);
+    try {
+      let finalCoverUrl = coverUrl;
 
-    if (mode === 'create') {
-      createMutation.mutate(payload, {
-        onSuccess: () => {
-          toast.success('¡Libro registrado exitosamente en el catálogo!');
-          navigate('/admin');
-        },
-        onError: (err: any) => {
-          toast.error('Error al registrar libro: ' + err.message);
-        },
-      });
-    } else {
-      if (!id) return;
-      updateMutation.mutate(
-        { id, data: payload },
-        {
+      // Si hay un archivo optimizado local seleccionado, subirlo ahora
+      if (file) {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const res = await apiClient.post<{ success: boolean; imageUrl: string }>(
+          '/admin/upload',
+          formData
+        );
+        finalCoverUrl = res.imageUrl;
+      }
+
+      const payload = {
+        isbn,
+        title,
+        originalTitle: originalTitle || null,
+        googleBooksId: googleBooksId || null,
+        authors,
+        synopsis: synopsis || null,
+        coverUrl: finalCoverUrl || null,
+        price: parseFloat(price),
+        stock: parseInt(stock, 10),
+        badge: badge || null,
+        genre: genre || null,
+      };
+
+      if (mode === 'create') {
+        createMutation.mutate(payload, {
           onSuccess: () => {
-            toast.success('¡Libro actualizado exitosamente en el catálogo!');
+            toast.success('¡Libro registrado exitosamente en el catálogo!');
             navigate('/admin');
           },
           onError: (err: any) => {
-            toast.error('Error al actualizar libro: ' + err.message);
+            toast.error('Error al registrar libro: ' + err.message);
           },
-        }
-      );
+        });
+      } else {
+        if (!id) return;
+        updateMutation.mutate(
+          { id, data: payload },
+          {
+            onSuccess: () => {
+              toast.success('¡Libro actualizado exitosamente en el catálogo!');
+              navigate('/admin');
+            },
+            onError: (err: any) => {
+              toast.error('Error al actualizar libro: ' + err.message);
+            },
+          }
+        );
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error('Error al procesar la subida de imagen: ' + err.message);
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -375,10 +419,15 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
             </div>
           )}
 
-          {coverUrl && (
+          {previewUrl && (
             <div className="bg-paper-dark/30 border border-paper-dark p-4 rounded-xl text-center space-y-2">
               <span className="block text-xs font-semibold text-ink-muted uppercase tracking-wider">Vista Previa Portada</span>
-              <img src={coverUrl} alt="Portada del libro" className="mx-auto max-h-48 object-cover rounded shadow-md border border-stone-200" />
+              <img src={previewUrl} alt="Portada del libro" className="mx-auto max-h-48 object-cover rounded shadow-md border border-stone-200" />
+              {file && (
+                <span className="block text-[10px] text-green-700 font-semibold bg-green-50 px-2 py-0.5 rounded-full inline-block mt-1">
+                  Nueva imagen seleccionada
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -498,7 +547,7 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
                     name="coverUrl"
                     type="url"
                     value={coverUrl}
-                    onChange={(e) => setCoverUrl(e.target.value)}
+                    onChange={(e) => handleCoverUrlChange(e.target.value)}
                     disabled={isMutating || uploadingImage}
                     className="w-full min-w-0 bg-paper border border-stone-300 rounded p-2 text-ink text-sm focus:ring-1 focus:ring-forest focus:outline-none"
                     placeholder="https://ejemplo.com/portada.jpg"
