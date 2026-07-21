@@ -51,3 +51,16 @@ export function useReactivateCombo() {
     mutateAsync: (id: string, options?: any) => updateMutation.mutateAsync({ id, data: { isActive: true } }, options),
   };
 }
+
+export function useUpdateComboStock() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, stock }: { id: string; stock: number }) =>
+      apiClient.patch<Combo>(`/combos/${id}`, { stock }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminCombosKeys.all });
+      queryClient.invalidateQueries({ queryKey: combosKeys.all });
+    },
+  });
+}

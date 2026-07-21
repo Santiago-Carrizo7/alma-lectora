@@ -146,7 +146,7 @@ function ComboCard({ combo, onAdd }: { combo: any; onAdd: (combo: any) => void }
             onClick={() => onAdd(combo)}
             className="text-xs py-1 px-2.5 font-semibold"
           >
-            Comprar Combo
+            Agregar
           </Button>
         </div>
       </div>
@@ -377,32 +377,7 @@ export function HomePage() {
             />
           )}
 
-          {/* SECCIÓN 3: SEPARADORES PREMIUM */}
-          {bookmarks.length > 0 && (
-            <SectionWrapper
-              title="Separadores Literarios"
-              subtitle="Separadores premium hechos a mano para tus lecturas."
-              viewAllLink="/accesorios"
-              mobileGrid={
-                <div className="grid grid-cols-2 gap-4 px-2">
-                  {bookmarks.slice(0, 4).map((acc) => (
-                    <AccessoryCard key={acc.id} acc={acc} onAdd={handleAddAccessoryToCart} />
-                  ))}
-                </div>
-              }
-              desktopCarousel={
-                <div className="flex gap-4 sm:gap-6 overflow-x-auto pb-4 pt-1 px-2 scroll-smooth snap-x snap-mandatory scrollbar-none">
-                  {bookmarks.map((acc: any) => (
-                    <div key={acc.id} className="w-56 sm:w-60 flex-shrink-0 snap-start">
-                      <AccessoryCard acc={acc} onAdd={handleAddAccessoryToCart} />
-                    </div>
-                  ))}
-                </div>
-              }
-            />
-          )}
-
-          {/* SECCIÓN 4: COMBOS LITERARIOS */}
+          {/* SECCIÓN 3: COMBOS LITERARIOS */}
           {combos.length > 0 && (
             <SectionWrapper
               title="Combos Literarios"
@@ -420,6 +395,31 @@ export function HomePage() {
                   {combos.map((combo: any) => (
                     <div key={combo.id} className="w-64 sm:w-72 flex-shrink-0 snap-start">
                       <ComboCard combo={combo} onAdd={handleAddComboToCart} />
+                    </div>
+                  ))}
+                </div>
+              }
+            />
+          )}
+
+          {/* SECCIÓN 4: SEPARADORES PREMIUM */}
+          {bookmarks.length > 0 && (
+            <SectionWrapper
+              title="Separadores Literarios"
+              subtitle="Separadores premium hechos a mano para tus lecturas."
+              viewAllLink="/accesorios"
+              mobileGrid={
+                <div className="grid grid-cols-2 gap-4 px-2">
+                  {bookmarks.slice(0, 4).map((acc) => (
+                    <AccessoryCard key={acc.id} acc={acc} onAdd={handleAddAccessoryToCart} />
+                  ))}
+                </div>
+              }
+              desktopCarousel={
+                <div className="flex gap-4 sm:gap-6 overflow-x-auto pb-4 pt-1 px-2 scroll-smooth snap-x snap-mandatory scrollbar-none">
+                  {bookmarks.map((acc: any) => (
+                    <div key={acc.id} className="w-56 sm:w-60 flex-shrink-0 snap-start">
+                      <AccessoryCard acc={acc} onAdd={handleAddAccessoryToCart} />
                     </div>
                   ))}
                 </div>

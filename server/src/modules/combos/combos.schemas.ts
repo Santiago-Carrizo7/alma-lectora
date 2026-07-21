@@ -11,6 +11,7 @@ export const createComboSchema = z.object({
   description: z.string().optional(),
   price: z.number().positive(),
   coverUrl: z.string().url().nullable().optional(),
+  stock: z.coerce.number().int().nonnegative().optional().default(0),
   isActive: z.boolean().optional(),
   books: z.array(
     z.object({

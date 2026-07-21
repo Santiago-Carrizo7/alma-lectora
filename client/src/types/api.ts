@@ -176,6 +176,7 @@ export interface Combo {
   description: string | null;
   price: string;
   coverUrl: string | null;
+  stock: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -197,6 +198,7 @@ export interface CreateComboPayload {
   description?: string;
   price: number;
   coverUrl?: string | null;
+  stock?: number;
   isActive?: boolean;
   books?: { bookId: string; quantity: number }[];
   accessories?: { accessoryId: string; quantity: number }[];

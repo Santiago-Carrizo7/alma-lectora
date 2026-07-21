@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAdminCombos } from '../hooks/combos.queries';
-import { useDeleteCombo, useReactivateCombo } from '../hooks/combos.mutations';
+import { useDeleteCombo, useReactivateCombo, useUpdateComboStock } from '../hooks/combos.mutations';
 import { Button } from '../../../components/ui/Button';
 import { Spinner } from '../../../components/ui/Spinner';
 import { formatPrice } from '../../../services/price';
 import type { Combo } from '../../../types/api';
 import { useToast } from '../../../components/ui/Toast';
+import { QuickStockModal } from './QuickStockModal';
 
 export function ComboManagementTable() {
   const navigate = useNavigate();
@@ -17,6 +18,20 @@ export function ComboManagementTable() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'available' | 'archived'>('available');
+
+  const [selectedComboForStock, setSelectedComboForStock] = useState<Combo | null>(null);
+  const [isStockModalOpen, setIsStockModalOpen] = useState(false);
+  const updateStockMutation = useUpdateComboStock();
+
+  const handleStockClick = (combo: Combo) => {
+    setSelectedComboForStock(combo);
+    setIsStockModalOpen(true);
+  };
+
+  const handleSaveStock = async (newStock: number) => {
+    if (!selectedComboForStock) return;
+    await updateStockMutation.mutateAsync({ id: selectedComboForStock.id, stock: newStock });
+  };
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -145,6 +160,7 @@ export function ComboManagementTable() {
               <th className="p-4">Título / Info</th>
               <th className="p-4 w-48">Contenido</th>
               <th className="p-4 w-28">Precio Combo</th>
+              <th className="p-4 w-24">Stock</th>
               <th className="p-4 w-24">Estado</th>
               <th className="p-4 w-32 text-right">Acciones</th>
             </tr>
@@ -152,7 +168,7 @@ export function ComboManagementTable() {
           <tbody className="divide-y divide-paper-dark">
             {combos.length === 0 ? (
               <tr>
-                <td colSpan={6} className="p-8 text-center text-ink-muted italic">
+                <td colSpan={7} className="p-8 text-center text-ink-muted italic">
                   No se encontraron combos.
                 </td>
               </tr>
@@ -203,6 +219,24 @@ export function ComboManagementTable() {
                     </td>
                     <td className="p-4 font-mono font-semibold text-amber">
                       {formatPrice(combo.price)}
+                    </td>
+                    <td className="p-4">
+                      <button
+                        type="button"
+                        onClick={() => handleStockClick(combo)}
+                        title="Actualizar stock"
+                        className="focus:outline-none focus:ring-2 focus:ring-forest focus:ring-offset-2 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
+                      >
+                        <span className={`font-mono text-xs font-semibold px-2 py-1 rounded-full ${
+                          combo.stock === 0
+                            ? 'bg-red-50 text-red-700'
+                            : combo.stock <= 2
+                            ? 'bg-yellow-50 text-yellow-700'
+                            : 'bg-green-50 text-green-700'
+                        }`}>
+                          {combo.stock}
+                        </span>
+                      </button>
                     </td>
                     <td className="p-4">
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
@@ -319,36 +353,56 @@ export function ComboManagementTable() {
                 </div>
 
                 {/* Fila Inferior */}
-                <div className="flex items-center justify-end gap-2 pt-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => navigate(`/admin/combos/editar/${combo.id}`)}
-                    className="text-xs px-2.5 py-1 border border-stone-300 font-semibold"
+                <div className="flex items-center justify-between pt-1">
+                  <button
+                    type="button"
+                    onClick={() => handleStockClick(combo)}
+                    title="Actualizar stock"
+                    className="flex items-center gap-2 bg-paper-dark hover:bg-stone-200 border border-stone-300 px-3 py-2 rounded-lg font-semibold text-xs transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-forest"
                   >
-                    Editar
-                  </Button>
-                  {activeTab === 'available' ? (
+                    <span className="text-ink-muted">Stock:</span>
+                    <span className={`font-mono text-xs font-bold px-2 py-0.5 rounded-full ${
+                      combo.stock === 0
+                        ? 'bg-red-50 text-red-700'
+                        : combo.stock <= 2
+                        ? 'bg-yellow-50 text-yellow-700'
+                        : 'bg-green-50 text-green-700'
+                    }`}>
+                      {combo.stock}
+                    </span>
+                  </button>
+
+                  <div className="flex items-center gap-2">
                     <Button
-                      variant="danger"
+                      variant="ghost"
                       size="sm"
-                      disabled={deleteMutation.isPending}
-                      onClick={() => handleDeleteClick(combo)}
-                      className="text-xs px-2.5 py-1 font-semibold"
+                      onClick={() => navigate(`/admin/combos/editar/${combo.id}`)}
+                      className="text-xs px-2.5 py-1 border border-stone-300 font-semibold"
                     >
-                      Baja
+                      Editar
                     </Button>
-                  ) : (
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      disabled={reactivateMutation.isPending}
-                      onClick={() => handleReactivateClick(combo)}
-                      className="text-xs px-2.5 py-1 font-semibold bg-forest text-white hover:bg-forest-light"
-                    >
-                      Reactivar
-                    </Button>
-                  )}
+                    {activeTab === 'available' ? (
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        disabled={deleteMutation.isPending}
+                        onClick={() => handleDeleteClick(combo)}
+                        className="text-xs px-2.5 py-1 font-semibold"
+                      >
+                        Baja
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        disabled={reactivateMutation.isPending}
+                        onClick={() => handleReactivateClick(combo)}
+                        className="text-xs px-2.5 py-1 font-semibold bg-forest text-white hover:bg-forest-light"
+                      >
+                        Reactivar
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             );
@@ -380,6 +434,19 @@ export function ComboManagementTable() {
           </Button>
         </div>
       )}
+
+      <QuickStockModal
+        isOpen={isStockModalOpen}
+        onClose={() => {
+          setIsStockModalOpen(false);
+          setSelectedComboForStock(null);
+        }}
+        title={selectedComboForStock?.title || ''}
+        subtitle={selectedComboForStock ? `Precio: ${formatPrice(selectedComboForStock.price)}` : undefined}
+        initialStock={selectedComboForStock?.stock ?? 0}
+        onSave={handleSaveStock}
+        isPending={updateStockMutation.isPending}
+      />
     </div>
   );
 }

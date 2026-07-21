@@ -40,6 +40,7 @@ export function ComboFormPanel({ mode }: ComboFormPanelProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
+  const [stock, setStock] = useState('0');
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [existingCoverUrl, setExistingCoverUrl] = useState<string | null>(null);
@@ -99,6 +100,7 @@ export function ComboFormPanel({ mode }: ComboFormPanelProps) {
       setTitle(comboData.title);
       setDescription(comboData.description || '');
       setPrice(comboData.price ? String(comboData.price) : '');
+      setStock(comboData.stock !== undefined ? String(comboData.stock) : '0');
       setExistingCoverUrl(comboData.coverUrl);
       setPreviewUrl(comboData.coverUrl);
 
@@ -131,6 +133,7 @@ export function ComboFormPanel({ mode }: ComboFormPanelProps) {
       setTitle('');
       setDescription('');
       setPrice('');
+      setStock('0');
       setExistingCoverUrl(null);
       setPreviewUrl(null);
       setFile(null);
@@ -268,6 +271,7 @@ export function ComboFormPanel({ mode }: ComboFormPanelProps) {
         description,
         price: Number(price),
         coverUrl: finalCoverUrl,
+        stock: parseInt(stock, 10),
         books: selectedBooks.map((b) => ({ bookId: b.id, quantity: b.quantity })),
         accessories: selectedAccessories.map((a) => ({ accessoryId: a.id, quantity: a.quantity })),
       };
@@ -439,6 +443,22 @@ export function ComboFormPanel({ mode }: ComboFormPanelProps) {
                   disabled={isPending}
                   className="w-full bg-paper border border-stone-300 rounded p-2 text-ink text-sm focus:ring-1 focus:ring-forest focus:outline-none font-mono"
                   placeholder="Ej: 8500.00"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-ink mb-1">
+                  Stock Disponible *
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  required
+                  value={stock}
+                  onChange={(e) => setStock(e.target.value)}
+                  disabled={isPending}
+                  className="w-full bg-paper border border-stone-300 rounded p-2 text-ink text-sm focus:ring-1 focus:ring-forest focus:outline-none font-mono"
+                  placeholder="Ej: 10"
                 />
               </div>
 
