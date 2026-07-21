@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { CombosController } from './combos.controller.js';
-import { getCombosQuerySchema, createComboSchema, updateComboSchema, comboIdParamSchema } from './combos.schemas.js';
+import { getCombosQuerySchema, createComboSchema, updateComboSchema, comboIdParamSchema, updateComboStockSchema } from './combos.schemas.js';
 import { validateSchema } from '../../middlewares/validateSchema.middleware.js';
 import { requireAuth } from '../../middlewares/auth.middleware.js';
 
@@ -33,6 +33,14 @@ combosRouter.patch(
   validateSchema(comboIdParamSchema, 'params'),
   validateSchema(updateComboSchema, 'body'),
   CombosController.updateCombo
+);
+
+combosRouter.patch(
+  '/:id/stock',
+  requireAuth,
+  validateSchema(comboIdParamSchema, 'params'),
+  validateSchema(updateComboStockSchema, 'body'),
+  CombosController.updateComboStock
 );
 
 combosRouter.delete(

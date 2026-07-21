@@ -84,7 +84,8 @@ export class BooksController {
    */
   static async deleteBook(req: Request, res: Response): Promise<void> {
     const { id } = req.params as BookIdParam;
-    await BooksService.deleteBook(id);
+    const permanent = req.query.permanent === 'true';
+    await BooksService.deleteBook(id, permanent);
     res.status(204).send();
   }
 

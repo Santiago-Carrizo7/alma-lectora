@@ -56,12 +56,25 @@ export function BookManagementTable() {
 
   const handleDeleteClick = (book: Book) => {
     if (window.confirm(`¿Confirmar baja lógica del libro "${book.title}"? El registro no se eliminará físicamente.`)) {
-      deleteMutation.mutate(book.id, {
+      deleteMutation.mutate({ id: book.id, permanent: false }, {
         onSuccess: () => {
           toast.success('¡Baja del libro registrada correctamente!');
         },
         onError: (err: any) => {
           toast.error('Error al dar de baja el libro: ' + err.message);
+        },
+      });
+    }
+  };
+
+  const handlePermanentDeleteClick = (book: Book) => {
+    if (window.confirm(`⚠️ ¿ELIMINAR PERMANENTEMENTE el libro "${book.title}"? Esta acción borrará el registro para siempre de la base de datos y su portada en Supabase. No se puede deshacer.`)) {
+      deleteMutation.mutate({ id: book.id, permanent: true }, {
+        onSuccess: () => {
+          toast.success('¡El libro ha sido eliminado físicamente del sistema!');
+        },
+        onError: (err: any) => {
+          toast.error('Error al eliminar físicamente: ' + err.message);
         },
       });
     }
@@ -233,7 +246,7 @@ export function BookManagementTable() {
                           >
                             Editar
                           </Button>
-                          {activeTab === 'available' ? (
+                           {activeTab === 'available' ? (
                             <Button
                               variant="danger"
                               disabled={deleteMutation.isPending}
@@ -243,14 +256,24 @@ export function BookManagementTable() {
                               Baja
                             </Button>
                           ) : (
-                            <Button
-                              variant="primary"
-                              disabled={updateMutation.isPending}
-                              onClick={() => handleReactivateClick(book)}
-                              className="text-xs px-2.5 py-1 font-semibold bg-forest text-white hover:bg-forest-light"
-                            >
-                              Reactivar
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="primary"
+                                disabled={updateMutation.isPending}
+                                onClick={() => handleReactivateClick(book)}
+                                className="text-xs px-2.5 py-1 font-semibold bg-forest text-white hover:bg-forest-light"
+                              >
+                                Reactivar
+                              </Button>
+                              <Button
+                                variant="danger"
+                                disabled={deleteMutation.isPending}
+                                onClick={() => handlePermanentDeleteClick(book)}
+                                className="text-xs px-2.5 py-1 font-semibold"
+                              >
+                                Eliminar
+                              </Button>
+                            </div>
                           )}
                         </div>
                       </td>
@@ -362,15 +385,26 @@ export function BookManagementTable() {
                         Baja
                       </Button>
                     ) : (
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        disabled={updateMutation.isPending}
-                        onClick={() => handleReactivateClick(book)}
-                        className="text-xs px-2.5 py-1 font-semibold bg-forest text-white hover:bg-forest-light"
-                      >
-                        Reactivar
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          disabled={updateMutation.isPending}
+                          onClick={() => handleReactivateClick(book)}
+                          className="text-xs px-2.5 py-1 font-semibold bg-forest text-white hover:bg-forest-light"
+                        >
+                          Reactivar
+                        </Button>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          disabled={deleteMutation.isPending}
+                          onClick={() => handlePermanentDeleteClick(book)}
+                          className="text-xs px-2.5 py-1 font-semibold"
+                        >
+                          Eliminar
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </div>

@@ -174,7 +174,32 @@ export class CombosService {
     return result;
   }
 
-  static async deleteCombo(id: string) {
+  static async updateComboStock(id: string, stock: number) {
+    return prisma.combo.update({
+      where: { id },
+      data: { stock },
+      include: {
+        books: true,
+        accessories: true,
+      },
+    });
+  }
+
+  static async deleteCombo(id: string, permanent = false) {
+    if (permanent) {
+      const existing = await prisma.combo.findUnique({
+        where: { id },
+      });
+      if (existing?.coverUrl) {
+        AdminService.deleteImage(existing.coverUrl).catch((err) => {
+          console.error('[CombosService:deleteCombo:deleteImage:Error]', err);
+        });
+      }
+      return prisma.combo.delete({
+        where: { id },
+      });
+    }
+
     return prisma.combo.update({
       where: { id },
       data: { isActive: false },

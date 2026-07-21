@@ -28,9 +28,17 @@ export class AccessoriesController {
     res.status(200).json(result);
   }
 
+  static async updateAccessoryStock(req: Request, res: Response): Promise<void> {
+    const { id } = req.params as AccessoryIdParam;
+    const { stock } = req.body;
+    const result = await AccessoriesService.updateAccessoryStock(id, stock);
+    res.status(200).json(result);
+  }
+
   static async deleteAccessory(req: Request, res: Response): Promise<void> {
     const { id } = req.params as AccessoryIdParam;
-    await AccessoriesService.deleteAccessory(id);
+    const permanent = req.query.permanent === 'true';
+    await AccessoriesService.deleteAccessory(id, permanent);
     res.status(204).send();
   }
 }

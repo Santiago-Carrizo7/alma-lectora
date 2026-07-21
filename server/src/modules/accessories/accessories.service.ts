@@ -78,7 +78,28 @@ export class AccessoriesService {
     return result;
   }
 
-  static async deleteAccessory(id: string) {
+  static async updateAccessoryStock(id: string, stock: number) {
+    return prisma.accessory.update({
+      where: { id },
+      data: { stock },
+    });
+  }
+
+  static async deleteAccessory(id: string, permanent = false) {
+    if (permanent) {
+      const existing = await prisma.accessory.findUnique({
+        where: { id },
+      });
+      if (existing?.coverUrl) {
+        AdminService.deleteImage(existing.coverUrl).catch((err) => {
+          console.error('[AccessoriesService:deleteAccessory:deleteImage:Error]', err);
+        });
+      }
+      return prisma.accessory.delete({
+        where: { id },
+      });
+    }
+
     return prisma.accessory.update({
       where: { id },
       data: { isActive: false },

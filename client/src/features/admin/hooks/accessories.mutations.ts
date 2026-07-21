@@ -34,7 +34,8 @@ export function useDeleteAccessory() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => apiClient.delete<void>(`/accessories/${id}`),
+    mutationFn: ({ id, permanent }: { id: string; permanent?: boolean }) =>
+      apiClient.delete<void>(`/accessories/${id}${permanent ? '?permanent=true' : ''}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminAccessoriesKeys.all });
       queryClient.invalidateQueries({ queryKey: accessoriesKeys.all });
@@ -57,7 +58,7 @@ export function useUpdateAccessoryStock() {
 
   return useMutation({
     mutationFn: ({ id, stock }: { id: string; stock: number }) =>
-      apiClient.patch<Accessory>(`/accessories/${id}`, { stock }),
+      apiClient.patch<Accessory>(`/accessories/${id}/stock`, { stock }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminAccessoriesKeys.all });
       queryClient.invalidateQueries({ queryKey: accessoriesKeys.all });

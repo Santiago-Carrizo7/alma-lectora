@@ -28,3 +28,8 @@ export type GetAccessoriesQuery = z.infer<typeof getAccessoriesQuerySchema>;
 export type CreateAccessoryInput = z.infer<typeof createAccessorySchema>;
 export type UpdateAccessoryInput = z.infer<typeof updateAccessorySchema>;
 export type AccessoryIdParam = z.infer<typeof accessoryIdParamSchema>;
+
+export const updateAccessoryStockSchema = z.object({
+  stock: z.coerce.number().int().nonnegative(),
+});
+export type UpdateAccessoryStockInput = z.infer<typeof updateAccessoryStockSchema>;

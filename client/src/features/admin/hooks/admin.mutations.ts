@@ -33,7 +33,8 @@ export function useDeleteBook() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => apiClient.delete<void>(`/books/${id}`),
+    mutationFn: ({ id, permanent }: { id: string; permanent?: boolean }) =>
+      apiClient.delete<void>(`/books/${id}${permanent ? '?permanent=true' : ''}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminBooksKeys.all });
       queryClient.invalidateQueries({ queryKey: booksKeys.all });

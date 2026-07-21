@@ -77,12 +77,25 @@ export function AccessoryManagementTable() {
 
   const handleDeleteClick = (accessory: Accessory) => {
     if (window.confirm(`¿Confirmar baja lógica del accesorio "${accessory.title}"? El registro no se eliminará físicamente.`)) {
-      deleteMutation.mutate(accessory.id, {
+      deleteMutation.mutate({ id: accessory.id, permanent: false }, {
         onSuccess: () => {
           toast.success('¡Baja del accesorio registrada correctamente!');
         },
         onError: (err: any) => {
           toast.error('Error al dar de baja el accesorio: ' + err.message);
+        },
+      });
+    }
+  };
+
+  const handlePermanentDeleteClick = (accessory: Accessory) => {
+    if (window.confirm(`⚠️ ¿ELIMINAR PERMANENTEMENTE el accesorio "${accessory.title}"? Esta acción borrará el registro para siempre de la base de datos y su portada en Supabase. No se puede deshacer.`)) {
+      deleteMutation.mutate({ id: accessory.id, permanent: true }, {
+        onSuccess: () => {
+          toast.success('¡El accesorio ha sido eliminado físicamente del sistema!');
+        },
+        onError: (err: any) => {
+          toast.error('Error al eliminar físicamente: ' + err.message);
         },
       });
     }
@@ -305,14 +318,24 @@ export function AccessoryManagementTable() {
                           Baja
                         </Button>
                       ) : (
-                        <Button
-                          variant="primary"
-                          disabled={reactivateMutation.isPending}
-                          onClick={() => handleReactivateClick(acc)}
-                          className="text-xs px-2.5 py-1 font-semibold bg-forest text-white hover:bg-forest-light"
-                        >
-                          Reactivar
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="primary"
+                            disabled={reactivateMutation.isPending}
+                            onClick={() => handleReactivateClick(acc)}
+                            className="text-xs px-2.5 py-1 font-semibold bg-forest text-white hover:bg-forest-light"
+                          >
+                            Reactivar
+                          </Button>
+                          <Button
+                            variant="danger"
+                            disabled={deleteMutation.isPending}
+                            onClick={() => handlePermanentDeleteClick(acc)}
+                            className="text-xs px-2.5 py-1 font-semibold"
+                          >
+                            Eliminar
+                          </Button>
+                        </div>
                       )}
                     </div>
                   </td>
@@ -417,15 +440,26 @@ export function AccessoryManagementTable() {
                       Baja
                     </Button>
                   ) : (
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      disabled={reactivateMutation.isPending}
-                      onClick={() => handleReactivateClick(acc)}
-                      className="text-xs px-2.5 py-1 font-semibold bg-forest text-white hover:bg-forest-light"
-                    >
-                      Reactivar
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        disabled={reactivateMutation.isPending}
+                        onClick={() => handleReactivateClick(acc)}
+                        className="text-xs px-2.5 py-1 font-semibold bg-forest text-white hover:bg-forest-light"
+                      >
+                        Reactivar
+                      </Button>
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        disabled={deleteMutation.isPending}
+                        onClick={() => handlePermanentDeleteClick(acc)}
+                        className="text-xs px-2.5 py-1 font-semibold"
+                      >
+                        Eliminar
+                      </Button>
+                    </div>
                   )}
                 </div>
               </div>

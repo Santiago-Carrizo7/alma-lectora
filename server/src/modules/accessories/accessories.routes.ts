@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { AccessoriesController } from './accessories.controller.js';
-import { getAccessoriesQuerySchema, createAccessorySchema, updateAccessorySchema, accessoryIdParamSchema } from './accessories.schemas.js';
+import { getAccessoriesQuerySchema, createAccessorySchema, updateAccessorySchema, accessoryIdParamSchema, updateAccessoryStockSchema } from './accessories.schemas.js';
 import { validateSchema } from '../../middlewares/validateSchema.middleware.js';
 import { requireAuth } from '../../middlewares/auth.middleware.js';
 import { AdminService } from '../admin/admin.service.js';
@@ -57,6 +57,14 @@ accessoriesRouter.patch(
   injectCoverUrl,
   validateSchema(updateAccessorySchema, 'body'),
   AccessoriesController.updateAccessory
+);
+
+accessoriesRouter.patch(
+  '/:id/stock',
+  requireAuth,
+  validateSchema(accessoryIdParamSchema, 'params'),
+  validateSchema(updateAccessoryStockSchema, 'body'),
+  AccessoriesController.updateAccessoryStock
 );
 
 accessoriesRouter.delete(

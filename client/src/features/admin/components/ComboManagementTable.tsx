@@ -69,12 +69,25 @@ export function ComboManagementTable() {
 
   const handleDeleteClick = (combo: Combo) => {
     if (window.confirm(`¿Confirmar baja lógica del combo "${combo.title}"? El registro no se eliminará físicamente.`)) {
-      deleteMutation.mutate(combo.id, {
+      deleteMutation.mutate({ id: combo.id, permanent: false }, {
         onSuccess: () => {
           toast.success('¡Baja del combo registrada correctamente!');
         },
         onError: (err: any) => {
           toast.error('Error al dar de baja el combo: ' + err.message);
+        },
+      });
+    }
+  };
+
+  const handlePermanentDeleteClick = (combo: Combo) => {
+    if (window.confirm(`⚠️ ¿ELIMINAR PERMANENTEMENTE el combo "${combo.title}"? Esta acción borrará el registro para siempre de la base de datos y su portada en Supabase. No se puede deshacer.`)) {
+      deleteMutation.mutate({ id: combo.id, permanent: true }, {
+        onSuccess: () => {
+          toast.success('¡El combo ha sido eliminado físicamente del sistema!');
+        },
+        onError: (err: any) => {
+          toast.error('Error al eliminar físicamente: ' + err.message);
         },
       });
     }
@@ -266,14 +279,24 @@ export function ComboManagementTable() {
                             Baja
                           </Button>
                         ) : (
-                          <Button
-                            variant="primary"
-                            disabled={reactivateMutation.isPending}
-                            onClick={() => handleReactivateClick(combo)}
-                            className="text-xs px-2.5 py-1 font-semibold bg-forest text-white hover:bg-forest-light"
-                          >
-                            Reactivar
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="primary"
+                              disabled={reactivateMutation.isPending}
+                              onClick={() => handleReactivateClick(combo)}
+                              className="text-xs px-2.5 py-1 font-semibold bg-forest text-white hover:bg-forest-light"
+                            >
+                              Reactivar
+                            </Button>
+                            <Button
+                              variant="danger"
+                              disabled={deleteMutation.isPending}
+                              onClick={() => handlePermanentDeleteClick(combo)}
+                              className="text-xs px-2.5 py-1 font-semibold"
+                            >
+                              Eliminar
+                            </Button>
+                          </div>
                         )}
                       </div>
                     </td>
@@ -392,15 +415,26 @@ export function ComboManagementTable() {
                         Baja
                       </Button>
                     ) : (
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        disabled={reactivateMutation.isPending}
-                        onClick={() => handleReactivateClick(combo)}
-                        className="text-xs px-2.5 py-1 font-semibold bg-forest text-white hover:bg-forest-light"
-                      >
-                        Reactivar
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          disabled={reactivateMutation.isPending}
+                          onClick={() => handleReactivateClick(combo)}
+                          className="text-xs px-2.5 py-1 font-semibold bg-forest text-white hover:bg-forest-light"
+                        >
+                          Reactivar
+                        </Button>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          disabled={deleteMutation.isPending}
+                          onClick={() => handlePermanentDeleteClick(combo)}
+                          className="text-xs px-2.5 py-1 font-semibold"
+                        >
+                          Eliminar
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </div>

@@ -34,7 +34,8 @@ export function useDeleteCombo() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => apiClient.delete<void>(`/combos/${id}`),
+    mutationFn: ({ id, permanent }: { id: string; permanent?: boolean }) =>
+      apiClient.delete<void>(`/combos/${id}${permanent ? '?permanent=true' : ''}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminCombosKeys.all });
       queryClient.invalidateQueries({ queryKey: combosKeys.all });
@@ -57,7 +58,7 @@ export function useUpdateComboStock() {
 
   return useMutation({
     mutationFn: ({ id, stock }: { id: string; stock: number }) =>
-      apiClient.patch<Combo>(`/combos/${id}`, { stock }),
+      apiClient.patch<Combo>(`/combos/${id}/stock`, { stock }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminCombosKeys.all });
       queryClient.invalidateQueries({ queryKey: combosKeys.all });

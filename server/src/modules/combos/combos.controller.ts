@@ -28,9 +28,17 @@ export class CombosController {
     res.status(200).json(result);
   }
 
+  static async updateComboStock(req: Request, res: Response): Promise<void> {
+    const { id } = req.params as ComboIdParam;
+    const { stock } = req.body;
+    const result = await CombosService.updateComboStock(id, stock);
+    res.status(200).json(result);
+  }
+
   static async deleteCombo(req: Request, res: Response): Promise<void> {
     const { id } = req.params as ComboIdParam;
-    await CombosService.deleteCombo(id);
+    const permanent = req.query.permanent === 'true';
+    await CombosService.deleteCombo(id, permanent);
     res.status(204).send();
   }
 }

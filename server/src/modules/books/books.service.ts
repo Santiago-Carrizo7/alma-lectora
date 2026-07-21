@@ -314,16 +314,24 @@ export class BooksService {
 
   /**
    * Performs logical delete of a book by setting isActive to false.
+   * Service method for deleting a book (either logically archiving or permanently removing).
    */
-  static async deleteBook(id: string) {
-    const existing = await prisma.book.findUnique({
-      where: { id },
-    });
-    if (!existing) {
-      throw new AppError('Libro no encontrado', 404);
+  static async deleteBook(id: string, permanent = false) {
+    if (permanent) {
+      const existing = await prisma.book.findUnique({
+        where: { id },
+      });
+      if (existing?.coverUrl) {
+        AdminService.deleteImage(existing.coverUrl).catch((err) => {
+          console.error('[BooksService:deleteBook:deleteImage:Error]', err);
+        });
+      }
+      return prisma.book.delete({
+        where: { id },
+      });
     }
 
-    await prisma.book.update({
+    return prisma.book.update({
       where: { id },
       data: { isActive: false },
     });

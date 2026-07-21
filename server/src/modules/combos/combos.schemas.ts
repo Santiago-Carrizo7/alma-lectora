@@ -37,3 +37,8 @@ export type GetCombosQuery = z.infer<typeof getCombosQuerySchema>;
 export type CreateComboInput = z.infer<typeof createComboSchema>;
 export type UpdateComboInput = z.infer<typeof updateComboSchema>;
 export type ComboIdParam = z.infer<typeof comboIdParamSchema>;
+
+export const updateComboStockSchema = z.object({
+  stock: z.coerce.number().int().nonnegative(),
+});
+export type UpdateComboStockInput = z.infer<typeof updateComboStockSchema>;
