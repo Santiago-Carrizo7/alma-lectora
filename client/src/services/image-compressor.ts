@@ -4,10 +4,10 @@
  */
 export async function compressImage(file: File): Promise<File> {
   const MAX_SIZE = 1.5 * 1024 * 1024; // 1.5 MB
-  const MAX_DIMENSION = 1600; // Max width or height
+  const MAX_DIMENSION = 1200; // Max width or height optimized for book covers
 
-  // If the file is small enough, return it as is
-  if (file.size <= MAX_SIZE) {
+  // If the file is already a webp and is small enough, return it as is
+  if (file.type === 'image/webp' && file.size <= MAX_SIZE) {
     return file;
   }
 
