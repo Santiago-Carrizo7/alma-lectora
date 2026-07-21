@@ -1,26 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../../../components/ui/Modal';
 import { Button } from '../../../components/ui/Button';
-import { useUpdateBookStock } from '../hooks/admin.mutations';
-import type { Book } from '../../../types/api';
 
 interface QuickStockModalProps {
   isOpen: boolean;
   onClose: () => void;
-  book: Book | null;
+  title: string;
+  subtitle?: string;
+  initialStock: number;
+  onSave: (newStock: number) => Promise<void> | void;
+  isPending?: boolean;
 }
 
-export function QuickStockModal({ isOpen, onClose, book }: QuickStockModalProps) {
+export function QuickStockModal({ isOpen, onClose, title, subtitle, initialStock, onSave, isPending }: QuickStockModalProps) {
   const [localStock, setLocalStock] = useState<number>(0);
-  const { mutate, isPending } = useUpdateBookStock();
 
   useEffect(() => {
-    if (book) {
-      setLocalStock(book.stock);
-    }
-  }, [book, isOpen]);
-
-  if (!book) return null;
+    setLocalStock(initialStock);
+  }, [initialStock, isOpen]);
 
   const handleDecrement = () => {
     setLocalStock((prev) => Math.max(0, prev - 1));
@@ -39,23 +36,21 @@ export function QuickStockModal({ isOpen, onClose, book }: QuickStockModalProps)
     }
   };
 
-  const handleSave = () => {
-    mutate(
-      { id: book.id, stock: localStock },
-      {
-        onSuccess: () => {
-          onClose();
-        },
-      }
-    );
+  const handleSave = async () => {
+    try {
+      await onSave(localStock);
+      onClose();
+    } catch (error) {
+      console.error('Error saving stock:', error);
+    }
   };
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Actualizar Inventario Rápido">
       <div className="flex flex-col items-center justify-center space-y-6 py-4">
-        <div className="text-center">
-          <h4 className="text-lg font-bold text-ink">{book.title}</h4>
-          <p className="text-xs text-ink-muted mt-1 font-mono">ISBN: {book.isbn}</p>
+        <div className="text-center max-w-xs sm:max-w-md">
+          <h4 className="text-lg font-bold text-ink truncate" title={title}>{title}</h4>
+          {subtitle && <p className="text-xs text-ink-muted mt-1 font-mono">{subtitle}</p>}
         </div>
 
         {/* Tactile Adjuster Layout */}

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAdminBooks } from '../hooks/admin.queries';
-import { useDeleteBook, useUpdateBook } from '../hooks/admin.mutations';
+import { useDeleteBook, useUpdateBook, useUpdateBookStock } from '../hooks/admin.mutations';
 import { Button } from '../../../components/ui/Button';
 import { Spinner } from '../../../components/ui/Spinner';
 import { formatPrice } from '../../../services/price';
@@ -38,6 +38,12 @@ export function BookManagementTable() {
 
   const deleteMutation = useDeleteBook();
   const updateMutation = useUpdateBook();
+  const updateStockMutation = useUpdateBookStock();
+
+  const handleSaveStock = async (newStock: number) => {
+    if (!selectedBookForStock) return;
+    await updateStockMutation.mutateAsync({ id: selectedBookForStock.id, stock: newStock });
+  };
 
   const books = data?.data || [];
   const total = data?.meta?.total || 0;
@@ -406,7 +412,11 @@ export function BookManagementTable() {
           setIsStockModalOpen(false);
           setSelectedBookForStock(null);
         }}
-        book={selectedBookForStock}
+        title={selectedBookForStock?.title || ''}
+        subtitle={selectedBookForStock ? `ISBN: ${selectedBookForStock.isbn}` : undefined}
+        initialStock={selectedBookForStock?.stock ?? 0}
+        onSave={handleSaveStock}
+        isPending={updateStockMutation.isPending}
       />
     </div>
   );

@@ -51,3 +51,16 @@ export function useReactivateAccessory() {
     mutateAsync: (id: string, options?: any) => updateMutation.mutateAsync({ id, data: { isActive: true } }, options),
   };
 }
+
+export function useUpdateAccessoryStock() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, stock }: { id: string; stock: number }) =>
+      apiClient.patch<Accessory>(`/accessories/${id}`, { stock }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminAccessoriesKeys.all });
+      queryClient.invalidateQueries({ queryKey: accessoriesKeys.all });
+    },
+  });
+}

@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAdminAccessories } from '../hooks/accessories.queries';
-import { useDeleteAccessory, useReactivateAccessory } from '../hooks/accessories.mutations';
+import { useDeleteAccessory, useReactivateAccessory, useUpdateAccessoryStock } from '../hooks/accessories.mutations';
 import { Button } from '../../../components/ui/Button';
 import { Spinner } from '../../../components/ui/Spinner';
 import { formatPrice } from '../../../services/price';
 import type { Accessory, AccessoryCategory } from '../../../types/api';
 import { useToast } from '../../../components/ui/Toast';
+import { QuickStockModal } from './QuickStockModal';
 
 const categoryLabels: Record<AccessoryCategory, string> = {
   VELAS: 'Velas',
@@ -24,6 +25,20 @@ export function AccessoryManagementTable() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [category, setCategory] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'available' | 'archived'>('available');
+
+  const [selectedAccessoryForStock, setSelectedAccessoryForStock] = useState<Accessory | null>(null);
+  const [isStockModalOpen, setIsStockModalOpen] = useState(false);
+  const updateStockMutation = useUpdateAccessoryStock();
+
+  const handleStockClick = (accessory: Accessory) => {
+    setSelectedAccessoryForStock(accessory);
+    setIsStockModalOpen(true);
+  };
+
+  const handleSaveStock = async (newStock: number) => {
+    if (!selectedAccessoryForStock) return;
+    await updateStockMutation.mutateAsync({ id: selectedAccessoryForStock.id, stock: newStock });
+  };
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -245,15 +260,22 @@ export function AccessoryManagementTable() {
                     {formatPrice(acc.price)}
                   </td>
                   <td className="p-4">
-                    <span className={`font-mono text-xs font-semibold px-2 py-1 rounded-full ${
-                      acc.stock === 0
-                        ? 'bg-red-50 text-red-700'
-                        : acc.stock <= 2
-                        ? 'bg-yellow-50 text-yellow-700'
-                        : 'bg-green-50 text-green-700'
-                    }`}>
-                      {acc.stock}
-                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleStockClick(acc)}
+                      title="Actualizar stock"
+                      className="focus:outline-none focus:ring-2 focus:ring-forest focus:ring-offset-2 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
+                    >
+                      <span className={`font-mono text-xs font-semibold px-2 py-1 rounded-full ${
+                        acc.stock === 0
+                          ? 'bg-red-50 text-red-700'
+                          : acc.stock <= 2
+                          ? 'bg-yellow-50 text-yellow-700'
+                          : 'bg-green-50 text-green-700'
+                      }`}>
+                        {acc.stock}
+                      </span>
+                    </button>
                   </td>
                   <td className="p-4">
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
@@ -357,7 +379,12 @@ export function AccessoryManagementTable() {
 
               {/* Fila Inferior */}
               <div className="flex items-center justify-between pt-1">
-                <div className="flex items-center gap-2 bg-paper-dark border border-stone-300 px-3 py-2 rounded-lg font-semibold text-xs transition-colors">
+                <button
+                  type="button"
+                  onClick={() => handleStockClick(acc)}
+                  title="Actualizar stock"
+                  className="flex items-center gap-2 bg-paper-dark hover:bg-stone-200 border border-stone-300 px-3 py-2 rounded-lg font-semibold text-xs transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-forest"
+                >
                   <span className="text-ink-muted">Stock:</span>
                   <span className={`font-mono text-xs font-bold px-2 py-0.5 rounded-full ${
                     acc.stock === 0
@@ -368,7 +395,7 @@ export function AccessoryManagementTable() {
                   }`}>
                     {acc.stock}
                   </span>
-                </div>
+                </button>
 
                 <div className="flex items-center gap-2">
                   <Button
@@ -431,6 +458,19 @@ export function AccessoryManagementTable() {
           </Button>
         </div>
       )}
+
+      <QuickStockModal
+        isOpen={isStockModalOpen}
+        onClose={() => {
+          setIsStockModalOpen(false);
+          setSelectedAccessoryForStock(null);
+        }}
+        title={selectedAccessoryForStock?.title || ''}
+        subtitle={selectedAccessoryForStock ? `Categoría: ${categoryLabels[selectedAccessoryForStock.category] || selectedAccessoryForStock.category}` : undefined}
+        initialStock={selectedAccessoryForStock?.stock ?? 0}
+        onSave={handleSaveStock}
+        isPending={updateStockMutation.isPending}
+      />
     </div>
   );
 }
