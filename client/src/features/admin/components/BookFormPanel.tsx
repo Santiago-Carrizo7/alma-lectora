@@ -273,7 +273,7 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
         createMutation.mutate(payload, {
           onSuccess: () => {
             toast.success('¡Libro registrado exitosamente en el catálogo!');
-            navigate('/admin');
+            navigate('/admin/libros');
           },
           onError: (err: any) => {
             toast.error('Error al registrar libro: ' + err.message);
@@ -286,7 +286,7 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
           {
             onSuccess: () => {
               toast.success('¡Libro actualizado exitosamente en el catálogo!');
-              navigate('/admin');
+              navigate('/admin/libros');
             },
             onError: (err: any) => {
               toast.error('Error al actualizar libro: ' + err.message);
@@ -315,7 +315,7 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
       <div>
         <button
           type="button"
-          onClick={() => navigate('/admin')}
+          onClick={() => navigate('/admin/libros')}
           className="text-xs text-forest hover:underline flex items-center gap-1 mb-2 font-medium"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
