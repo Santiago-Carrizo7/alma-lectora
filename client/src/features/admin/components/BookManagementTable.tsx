@@ -8,6 +8,12 @@ import { formatPrice } from '../../../services/price';
 import type { Book } from '../../../types/api';
 import { QuickStockModal } from './QuickStockModal';
 import { useToast } from '../../../components/ui/Toast';
+import { ConfirmModal } from '../../../components/ui/ConfirmModal';
+
+interface BookConfirmState {
+  type: 'soft-delete' | 'permanent-delete' | 'reactivate';
+  book: Book;
+}
 
 export function BookManagementTable() {
   const navigate = useNavigate();
@@ -18,6 +24,7 @@ export function BookManagementTable() {
   const [selectedBookForStock, setSelectedBookForStock] = useState<Book | null>(null);
   const [isStockModalOpen, setIsStockModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'available' | 'archived'>('available');
+  const [confirmState, setConfirmState] = useState<BookConfirmState | null>(null);
 
   const handleStockClick = (book: Book) => {
     setSelectedBookForStock(book);
@@ -55,40 +62,53 @@ export function BookManagementTable() {
   };
 
   const handleDeleteClick = (book: Book) => {
-    if (window.confirm(`¿Confirmar baja lógica del libro "${book.title}"? El registro no se eliminará físicamente.`)) {
-      deleteMutation.mutate({ id: book.id, permanent: false }, {
-        onSuccess: () => {
-          toast.success('¡Baja del libro registrada correctamente!');
-        },
-        onError: (err: any) => {
-          toast.error('Error al dar de baja el libro: ' + err.message);
-        },
-      });
-    }
+    setConfirmState({ type: 'soft-delete', book });
   };
 
   const handlePermanentDeleteClick = (book: Book) => {
-    if (window.confirm(`⚠️ ¿ELIMINAR PERMANENTEMENTE el libro "${book.title}"? Esta acción borrará el registro para siempre de la base de datos y su portada en Supabase. No se puede deshacer.`)) {
-      deleteMutation.mutate({ id: book.id, permanent: true }, {
-        onSuccess: () => {
-          toast.success('¡El libro ha sido eliminado físicamente del sistema!');
-        },
-        onError: (err: any) => {
-          toast.error('Error al eliminar físicamente: ' + err.message);
-        },
-      });
-    }
+    setConfirmState({ type: 'permanent-delete', book });
   };
 
   const handleReactivateClick = (book: Book) => {
-    if (window.confirm(`¿Confirmar reactivación del libro "${book.title}"?`)) {
+    setConfirmState({ type: 'reactivate', book });
+  };
+
+  const handleConfirmAction = () => {
+    if (!confirmState) return;
+    const { type, book } = confirmState;
+
+    if (type === 'soft-delete') {
+      deleteMutation.mutate({ id: book.id, permanent: false }, {
+        onSuccess: () => {
+          toast.success('¡Baja del libro registrada correctamente!');
+          setConfirmState(null);
+        },
+        onError: (err: any) => {
+          toast.error('Error al dar de baja el libro: ' + err.message);
+          setConfirmState(null);
+        },
+      });
+    } else if (type === 'permanent-delete') {
+      deleteMutation.mutate({ id: book.id, permanent: true }, {
+        onSuccess: () => {
+          toast.success('¡El libro ha sido eliminado físicamente del sistema!');
+          setConfirmState(null);
+        },
+        onError: (err: any) => {
+          toast.error('Error al eliminar físicamente: ' + err.message);
+          setConfirmState(null);
+        },
+      });
+    } else if (type === 'reactivate') {
       updateMutation.mutate({ id: book.id, data: { isActive: true } }, {
         onSuccess: () => {
           toast.success('¡El libro ha sido reactivado correctamente!');
           setActiveTab('available');
+          setConfirmState(null);
         },
         onError: (err: any) => {
           toast.error('Error al reactivar el libro: ' + err.message);
+          setConfirmState(null);
         },
       });
     }
@@ -451,6 +471,43 @@ export function BookManagementTable() {
         initialStock={selectedBookForStock?.stock ?? 0}
         onSave={handleSaveStock}
         isPending={updateStockMutation.isPending}
+      />
+
+      <ConfirmModal
+        isOpen={!!confirmState}
+        onClose={() => setConfirmState(null)}
+        onConfirm={handleConfirmAction}
+        isLoading={deleteMutation.isPending || updateMutation.isPending}
+        variant={confirmState?.type === 'permanent-delete' ? 'danger' : 'forest'}
+        title={
+          confirmState?.type === 'soft-delete'
+            ? '¿Dar de baja al libro?'
+            : confirmState?.type === 'permanent-delete'
+            ? '¿Eliminar permanentemente el libro?'
+            : '¿Reactivar el libro?'
+        }
+        description={
+          confirmState?.type === 'soft-delete' ? (
+            <>
+              Estás por dar de baja a <strong className="text-ink font-bold font-sans">{confirmState.book.title}</strong>. El registro permanecerá en el sistema pero pasará a estado inactivo.
+            </>
+          ) : confirmState?.type === 'permanent-delete' ? (
+            <>
+              ⚠️ Estás por eliminar permanentemente el libro <strong className="text-ink font-bold font-sans">{confirmState.book.title}</strong>. Esta acción borrará el registro y su portada de la base de datos de forma irreversible.
+            </>
+          ) : (
+            <>
+              Estás por reactivar el libro <strong className="text-ink font-bold font-sans">{confirmState?.book.title}</strong> para mostrarlo nuevamente en el catálogo disponible.
+            </>
+          )
+        }
+        confirmText={
+          confirmState?.type === 'soft-delete'
+            ? 'Sí, dar de baja'
+            : confirmState?.type === 'permanent-delete'
+            ? 'Sí, eliminar'
+            : 'Sí, reactivar'
+        }
       />
     </div>
   );

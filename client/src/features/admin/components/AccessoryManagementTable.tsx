@@ -8,12 +8,18 @@ import { formatPrice } from '../../../services/price';
 import type { Accessory, AccessoryCategory } from '../../../types/api';
 import { useToast } from '../../../components/ui/Toast';
 import { QuickStockModal } from './QuickStockModal';
+import { ConfirmModal } from '../../../components/ui/ConfirmModal';
 
 const categoryLabels: Record<AccessoryCategory, string> = {
   VELAS: 'Velas',
   SEPARADORES: 'Separadores',
   TRES_D: '3D',
 };
+
+interface AccessoryConfirmState {
+  type: 'soft-delete' | 'permanent-delete' | 'reactivate';
+  accessory: Accessory;
+}
 
 export function AccessoryManagementTable() {
   const navigate = useNavigate();
@@ -25,6 +31,7 @@ export function AccessoryManagementTable() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [category, setCategory] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'available' | 'archived'>('available');
+  const [confirmState, setConfirmState] = useState<AccessoryConfirmState | null>(null);
 
   const [selectedAccessoryForStock, setSelectedAccessoryForStock] = useState<Accessory | null>(null);
   const [isStockModalOpen, setIsStockModalOpen] = useState(false);
@@ -76,40 +83,53 @@ export function AccessoryManagementTable() {
   };
 
   const handleDeleteClick = (accessory: Accessory) => {
-    if (window.confirm(`¿Confirmar baja lógica del accesorio "${accessory.title}"? El registro no se eliminará físicamente.`)) {
-      deleteMutation.mutate({ id: accessory.id, permanent: false }, {
-        onSuccess: () => {
-          toast.success('¡Baja del accesorio registrada correctamente!');
-        },
-        onError: (err: any) => {
-          toast.error('Error al dar de baja el accesorio: ' + err.message);
-        },
-      });
-    }
+    setConfirmState({ type: 'soft-delete', accessory });
   };
 
   const handlePermanentDeleteClick = (accessory: Accessory) => {
-    if (window.confirm(`⚠️ ¿ELIMINAR PERMANENTEMENTE el accesorio "${accessory.title}"? Esta acción borrará el registro para siempre de la base de datos y su portada en Supabase. No se puede deshacer.`)) {
-      deleteMutation.mutate({ id: accessory.id, permanent: true }, {
-        onSuccess: () => {
-          toast.success('¡El accesorio ha sido eliminado físicamente del sistema!');
-        },
-        onError: (err: any) => {
-          toast.error('Error al eliminar físicamente: ' + err.message);
-        },
-      });
-    }
+    setConfirmState({ type: 'permanent-delete', accessory });
   };
 
   const handleReactivateClick = (accessory: Accessory) => {
-    if (window.confirm(`¿Confirmar reactivación del accesorio "${accessory.title}"?`)) {
+    setConfirmState({ type: 'reactivate', accessory });
+  };
+
+  const handleConfirmAction = () => {
+    if (!confirmState) return;
+    const { type, accessory } = confirmState;
+
+    if (type === 'soft-delete') {
+      deleteMutation.mutate({ id: accessory.id, permanent: false }, {
+        onSuccess: () => {
+          toast.success('¡Baja del accesorio registrada correctamente!');
+          setConfirmState(null);
+        },
+        onError: (err: any) => {
+          toast.error('Error al dar de baja el accesorio: ' + err.message);
+          setConfirmState(null);
+        },
+      });
+    } else if (type === 'permanent-delete') {
+      deleteMutation.mutate({ id: accessory.id, permanent: true }, {
+        onSuccess: () => {
+          toast.success('¡El accesorio ha sido eliminado físicamente del sistema!');
+          setConfirmState(null);
+        },
+        onError: (err: any) => {
+          toast.error('Error al eliminar físicamente: ' + err.message);
+          setConfirmState(null);
+        },
+      });
+    } else if (type === 'reactivate') {
       reactivateMutation.mutate(accessory.id, {
         onSuccess: () => {
           toast.success('¡El accesorio ha sido reactivado correctamente!');
           setActiveTab('available');
+          setConfirmState(null);
         },
         onError: (err: any) => {
           toast.error('Error al reactivar el accesorio: ' + err.message);
+          setConfirmState(null);
         },
       });
     }
@@ -504,6 +524,43 @@ export function AccessoryManagementTable() {
         initialStock={selectedAccessoryForStock?.stock ?? 0}
         onSave={handleSaveStock}
         isPending={updateStockMutation.isPending}
+      />
+
+      <ConfirmModal
+        isOpen={!!confirmState}
+        onClose={() => setConfirmState(null)}
+        onConfirm={handleConfirmAction}
+        isLoading={deleteMutation.isPending || reactivateMutation.isPending}
+        variant={confirmState?.type === 'permanent-delete' ? 'danger' : 'forest'}
+        title={
+          confirmState?.type === 'soft-delete'
+            ? '¿Dar de baja al accesorio?'
+            : confirmState?.type === 'permanent-delete'
+            ? '¿Eliminar permanentemente el accesorio?'
+            : '¿Reactivar el accesorio?'
+        }
+        description={
+          confirmState?.type === 'soft-delete' ? (
+            <>
+              Estás por dar de baja a <strong className="text-ink font-bold font-sans">{confirmState.accessory.title}</strong>. El registro permanecerá en el sistema pero pasará a estado inactivo.
+            </>
+          ) : confirmState?.type === 'permanent-delete' ? (
+            <>
+              ⚠️ Estás por eliminar permanentemente el accesorio <strong className="text-ink font-bold font-sans">{confirmState.accessory.title}</strong>. Esta acción borrará el registro de la base de datos de forma irreversible.
+            </>
+          ) : (
+            <>
+              Estás por reactivar el accesorio <strong className="text-ink font-bold font-sans">{confirmState?.accessory.title}</strong> para mostrarlo nuevamente en la tienda.
+            </>
+          )
+        }
+        confirmText={
+          confirmState?.type === 'soft-delete'
+            ? 'Sí, dar de baja'
+            : confirmState?.type === 'permanent-delete'
+            ? 'Sí, eliminar'
+            : 'Sí, reactivar'
+        }
       />
     </div>
   );

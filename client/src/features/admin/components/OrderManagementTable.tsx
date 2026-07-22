@@ -7,12 +7,20 @@ import { formatPrice } from '../../../services/price';
 import { BookThumbnail } from '../../../components/ui/BookThumbnail';
 import { useToast } from '../../../components/ui/Toast';
 import type { OrderLead, OrderStatus } from '../../../types/api';
+import { ConfirmModal } from '../../../components/ui/ConfirmModal';
+
+interface OrderConfirmState {
+  orderId: string;
+  customerName: string;
+  status: 'CONFIRMED' | 'CANCELLED';
+}
 
 export function OrderManagementTable() {
   const toast = useToast();
   const [activeTab, setActiveTab] = useState<OrderStatus>('PENDING_WHATSAPP');
   const [page, setPage] = useState(1);
   const limit = 10;
+  const [confirmState, setConfirmState] = useState<OrderConfirmState | null>(null);
 
   const { data, isLoading, error } = useAdminOrders({
     status: activeTab,
@@ -31,25 +39,32 @@ export function OrderManagementTable() {
     setPage(1);
   };
 
-  const handleStatusUpdate = (id: string, status: 'CONFIRMED' | 'CANCELLED') => {
-    const actionText = status === 'CONFIRMED' ? 'confirmar' : 'cancelar';
-    const confirmMessage = status === 'CONFIRMED'
-      ? '¿Estás seguro de confirmar este pedido? Se descontará el stock correspondiente.'
-      : '¿Estás seguro de cancelar este pedido? Se liberará el producto sin tocar el stock.';
+  const handleStatusUpdate = (order: OrderLead, status: 'CONFIRMED' | 'CANCELLED') => {
+    setConfirmState({
+      orderId: order.id,
+      customerName: order.customerName,
+      status,
+    });
+  };
 
-    if (window.confirm(confirmMessage)) {
-      updateStatusMutation.mutate(
-        { id, status },
-        {
-          onSuccess: () => {
-            toast.success(`Pedido ${status === 'CONFIRMED' ? 'confirmado' : 'cancelado'} correctamente.`);
-          },
-          onError: (err: any) => {
-            toast.error(`Error al ${actionText} el pedido: ${err.message}`);
-          },
-        }
-      );
-    }
+  const handleConfirmAction = () => {
+    if (!confirmState) return;
+    const { orderId, status } = confirmState;
+    const actionText = status === 'CONFIRMED' ? 'confirmar' : 'cancelar';
+
+    updateStatusMutation.mutate(
+      { id: orderId, status },
+      {
+        onSuccess: () => {
+          toast.success(`Pedido ${status === 'CONFIRMED' ? 'confirmado' : 'cancelado'} correctamente.`);
+          setConfirmState(null);
+        },
+        onError: (err: any) => {
+          toast.error(`Error al ${actionText} el pedido: ${err.message}`);
+          setConfirmState(null);
+        },
+      }
+    );
   };
 
   const getWhatsAppUrl = (phone: string) => {
@@ -279,7 +294,7 @@ export function OrderManagementTable() {
                           isProcessingThis &&
                           updateStatusMutation.variables?.status === 'CANCELLED'
                         }
-                        onClick={() => handleStatusUpdate(order.id, 'CANCELLED')}
+                        onClick={() => handleStatusUpdate(order, 'CANCELLED')}
                         className="py-2.5 text-xs font-bold font-serif shadow-xs cursor-pointer border border-transparent"
                       >
                         Rechazar
@@ -292,7 +307,7 @@ export function OrderManagementTable() {
                           isProcessingThis &&
                           updateStatusMutation.variables?.status === 'CONFIRMED'
                         }
-                        onClick={() => handleStatusUpdate(order.id, 'CONFIRMED')}
+                        onClick={() => handleStatusUpdate(order, 'CONFIRMED')}
                         className="py-2.5 text-xs font-bold font-serif shadow-xs bg-forest hover:bg-forest-light text-white cursor-pointer border border-transparent"
                       >
                         Aceptar y Descontar
@@ -330,6 +345,35 @@ export function OrderManagementTable() {
           </Button>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={!!confirmState}
+        onClose={() => setConfirmState(null)}
+        onConfirm={handleConfirmAction}
+        isLoading={updateStatusMutation.isPending}
+        variant={confirmState?.status === 'CANCELLED' ? 'danger' : 'forest'}
+        title={
+          confirmState?.status === 'CONFIRMED'
+            ? '¿Confirmar pedido?'
+            : '¿Rechazar pedido?'
+        }
+        description={
+          confirmState?.status === 'CONFIRMED' ? (
+            <>
+              Estás por confirmar el pedido de <strong className="text-ink font-bold font-sans">{confirmState.customerName}</strong>. Se descontará automáticamente el stock correspondiente.
+            </>
+          ) : (
+            <>
+              Estás por rechazar el pedido de <strong className="text-ink font-bold font-sans">{confirmState?.customerName}</strong>. Se liberará el producto sin modificar el stock.
+            </>
+          )
+        }
+        confirmText={
+          confirmState?.status === 'CONFIRMED'
+            ? 'Sí, confirmar'
+            : 'Sí, rechazar'
+        }
+      />
     </div>
   );
 }

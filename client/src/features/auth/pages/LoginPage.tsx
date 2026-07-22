@@ -15,6 +15,7 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -39,6 +40,7 @@ export function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMsg(null);
     setLoginLoading(true);
     try {
       await apiClient.post<{ success: boolean }>('/auth/login', {
@@ -50,7 +52,7 @@ export function LoginPage() {
       const redirectTo = queryParams.get('redirect') || '/admin';
       navigate(redirectTo, { replace: true });
     } catch (err: any) {
-      alert('Error de inicio de sesión: ' + err.message);
+      setErrorMsg(err?.message || 'Credenciales inválidas. Por favor verifique su email y contraseña.');
     } finally {
       setLoginLoading(false);
     }
@@ -109,6 +111,15 @@ export function LoginPage() {
               </button>
             </div>
           </div>
+
+          {errorMsg && (
+            <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex items-center gap-2.5 animate-fade-in">
+              <svg className="w-4 h-4 shrink-0 text-red-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+              </svg>
+              <span>{errorMsg}</span>
+            </div>
+          )}
 
           <Button
             type="submit"

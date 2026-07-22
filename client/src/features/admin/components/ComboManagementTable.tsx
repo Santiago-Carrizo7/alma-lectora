@@ -8,6 +8,12 @@ import { formatPrice } from '../../../services/price';
 import type { Combo } from '../../../types/api';
 import { useToast } from '../../../components/ui/Toast';
 import { QuickStockModal } from './QuickStockModal';
+import { ConfirmModal } from '../../../components/ui/ConfirmModal';
+
+interface ComboConfirmState {
+  type: 'soft-delete' | 'permanent-delete' | 'reactivate';
+  combo: Combo;
+}
 
 export function ComboManagementTable() {
   const navigate = useNavigate();
@@ -18,6 +24,7 @@ export function ComboManagementTable() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'available' | 'archived'>('available');
+  const [confirmState, setConfirmState] = useState<ComboConfirmState | null>(null);
 
   const [selectedComboForStock, setSelectedComboForStock] = useState<Combo | null>(null);
   const [isStockModalOpen, setIsStockModalOpen] = useState(false);
@@ -68,39 +75,52 @@ export function ComboManagementTable() {
   };
 
   const handleDeleteClick = (combo: Combo) => {
-    if (window.confirm(`¿Confirmar baja lógica del combo "${combo.title}"? El registro no se eliminará físicamente.`)) {
-      deleteMutation.mutate({ id: combo.id, permanent: false }, {
-        onSuccess: () => {
-          toast.success('¡Baja del combo registrada correctamente!');
-        },
-        onError: (err: any) => {
-          toast.error('Error al dar de baja el combo: ' + err.message);
-        },
-      });
-    }
+    setConfirmState({ type: 'soft-delete', combo });
   };
 
   const handlePermanentDeleteClick = (combo: Combo) => {
-    if (window.confirm(`⚠️ ¿ELIMINAR PERMANENTEMENTE el combo "${combo.title}"? Esta acción borrará el registro para siempre de la base de datos y su portada en Supabase. No se puede deshacer.`)) {
-      deleteMutation.mutate({ id: combo.id, permanent: true }, {
-        onSuccess: () => {
-          toast.success('¡El combo ha sido eliminado físicamente del sistema!');
-        },
-        onError: (err: any) => {
-          toast.error('Error al eliminar físicamente: ' + err.message);
-        },
-      });
-    }
+    setConfirmState({ type: 'permanent-delete', combo });
   };
 
   const handleReactivateClick = (combo: Combo) => {
-    if (window.confirm(`¿Confirmar reactivación del combo "${combo.title}"?`)) {
+    setConfirmState({ type: 'reactivate', combo });
+  };
+
+  const handleConfirmAction = () => {
+    if (!confirmState) return;
+    const { type, combo } = confirmState;
+
+    if (type === 'soft-delete') {
+      deleteMutation.mutate({ id: combo.id, permanent: false }, {
+        onSuccess: () => {
+          toast.success('¡Baja del combo registrada correctamente!');
+          setConfirmState(null);
+        },
+        onError: (err: any) => {
+          toast.error('Error al dar de baja el combo: ' + err.message);
+          setConfirmState(null);
+        },
+      });
+    } else if (type === 'permanent-delete') {
+      deleteMutation.mutate({ id: combo.id, permanent: true }, {
+        onSuccess: () => {
+          toast.success('¡El combo ha sido eliminado físicamente del sistema!');
+          setConfirmState(null);
+        },
+        onError: (err: any) => {
+          toast.error('Error al eliminar físicamente: ' + err.message);
+          setConfirmState(null);
+        },
+      });
+    } else if (type === 'reactivate') {
       reactivateMutation.mutate(combo.id, {
         onSuccess: () => {
           toast.success('¡El combo ha sido reactivado correctamente!');
+          setConfirmState(null);
         },
         onError: (err: any) => {
           toast.error('Error al reactivar el combo: ' + err.message);
+          setConfirmState(null);
         },
       });
     }
@@ -480,6 +500,43 @@ export function ComboManagementTable() {
         initialStock={selectedComboForStock?.stock ?? 0}
         onSave={handleSaveStock}
         isPending={updateStockMutation.isPending}
+      />
+
+      <ConfirmModal
+        isOpen={!!confirmState}
+        onClose={() => setConfirmState(null)}
+        onConfirm={handleConfirmAction}
+        isLoading={deleteMutation.isPending || reactivateMutation.isPending}
+        variant={confirmState?.type === 'permanent-delete' ? 'danger' : 'forest'}
+        title={
+          confirmState?.type === 'soft-delete'
+            ? '¿Dar de baja al combo?'
+            : confirmState?.type === 'permanent-delete'
+            ? '¿Eliminar permanentemente el combo?'
+            : '¿Reactivar el combo?'
+        }
+        description={
+          confirmState?.type === 'soft-delete' ? (
+            <>
+              Estás por dar de baja a <strong className="text-ink font-bold font-sans">{confirmState.combo.title}</strong>. El registro permanecerá en el sistema pero pasará a estado inactivo.
+            </>
+          ) : confirmState?.type === 'permanent-delete' ? (
+            <>
+              ⚠️ Estás por eliminar permanentemente el combo <strong className="text-ink font-bold font-sans">{confirmState.combo.title}</strong>. Esta acción borrará el registro de la base de datos de forma irreversible.
+            </>
+          ) : (
+            <>
+              Estás por reactivar el combo <strong className="text-ink font-bold font-sans">{confirmState?.combo.title}</strong> para mostrarlo nuevamente en la tienda.
+            </>
+          )
+        }
+        confirmText={
+          confirmState?.type === 'soft-delete'
+            ? 'Sí, dar de baja'
+            : confirmState?.type === 'permanent-delete'
+            ? 'Sí, eliminar'
+            : 'Sí, reactivar'
+        }
       />
     </div>
   );
