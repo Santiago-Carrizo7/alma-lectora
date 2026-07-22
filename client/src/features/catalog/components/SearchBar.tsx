@@ -44,6 +44,7 @@ export function SearchBar({ value, onChange }: SearchBarProps) {
         value={localVal}
         onChange={(e) => setLocalVal(e.target.value)}
         placeholder="Buscar por título, autor o palabra clave..."
+        aria-label="Buscar libros por título o autor"
         className="block w-full pl-11 pr-4 py-3 border border-stone-300 rounded-lg bg-paper text-ink font-sans placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-forest/35 focus:border-forest transition-all duration-300 shadow-xs"
       />
       {localVal && (

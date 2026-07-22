@@ -6,6 +6,7 @@ import { Spinner } from '../../../components/ui/Spinner';
 import { Button } from '../../../components/ui/Button';
 import { Badge } from '../../../components/ui/Badge';
 import { SearchBar } from '../components/SearchBar';
+import { SEOHead } from '../../../components/ui/SEOHead';
 
 const CATEGORIES = [
   { value: '', label: 'Todos' },
@@ -49,6 +50,10 @@ export function AccessoriesPage() {
 
   return (
     <div className="space-y-8 animate-fade-in">
+      <SEOHead
+        title="Accesorios Literarios | Alma Lectora"
+        description="Encontrá velas aromáticas inspiradas en libros, separadores artesanales e impresiones 3D en Alma Lectora."
+      />
       <div className="text-center max-w-xl mx-auto space-y-2">
         <h1 className="text-3xl sm:text-4xl font-bold font-serif text-ink tracking-tight">Accesorios Literarios</h1>
         <p className="text-sm text-stone-500 font-sans">

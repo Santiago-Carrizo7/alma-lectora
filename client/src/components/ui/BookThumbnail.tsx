@@ -4,9 +4,17 @@ interface BookThumbnailProps {
   src: string | null;
   title: string;
   className?: string;
+  loading?: 'lazy' | 'eager';
+  decoding?: 'async' | 'sync' | 'auto';
 }
 
-export function BookThumbnail({ src, title, className = '' }: BookThumbnailProps) {
+export function BookThumbnail({
+  src,
+  title,
+  className = '',
+  loading = 'lazy',
+  decoding = 'async',
+}: BookThumbnailProps) {
   const [hasError, setHasError] = useState(false);
 
   if (!src || hasError) {
@@ -38,7 +46,9 @@ export function BookThumbnail({ src, title, className = '' }: BookThumbnailProps
   return (
     <img
       src={src}
-      alt={title}
+      alt={`Portada del libro ${title}`}
+      loading={loading}
+      decoding={decoding}
       onError={() => setHasError(true)}
       className={className}
     />

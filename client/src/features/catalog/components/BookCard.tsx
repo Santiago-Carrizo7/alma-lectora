@@ -37,6 +37,7 @@ export function BookCard({ book, onViewDetail }: BookCardProps) {
   return (
     <div
       onClick={isOutOfStock ? undefined : () => onViewDetail(book)}
+      aria-label={isOutOfStock ? `${book.title} - Agotado` : `Ver detalles de ${book.title}`}
       className={`group relative flex flex-col h-full bg-paper-dark/30 rounded-card overflow-hidden border border-paper-dark transition-all duration-300 ${
         isOutOfStock
           ? 'cursor-default opacity-90'
@@ -48,6 +49,8 @@ export function BookCard({ book, onViewDetail }: BookCardProps) {
         <BookThumbnail
           src={book.coverUrl}
           title={book.title}
+          loading="lazy"
+          decoding="async"
           className={`object-cover w-full h-full transition-transform duration-500 group-hover:scale-105 ${
             isOutOfStock ? 'grayscale opacity-40' : ''
           }`}
@@ -96,6 +99,7 @@ export function BookCard({ book, onViewDetail }: BookCardProps) {
             size="sm"
             onClick={isOutOfStock ? undefined : handleAddToCart}
             disabled={isOutOfStock}
+            aria-label={isOutOfStock ? `${book.title} está agotado` : `Agregar ${book.title} al carrito`}
             className="text-xs font-semibold py-1.5 px-3"
           >
             {isOutOfStock ? 'Agotado' : 'Agregar'}

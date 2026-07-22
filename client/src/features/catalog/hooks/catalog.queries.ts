@@ -16,7 +16,7 @@ export const booksKeys = {
 };
 
 export function useBooks(params: UseBooksParams = {}) {
-  const { search = '', genre = '', badge = '', page = 1, limit = 24 } = params;
+  const { search = '', genre = '', badge = '', page = 1, limit = 12 } = params;
 
   const qs = new URLSearchParams();
   if (search) qs.append('search', search);
@@ -45,7 +45,7 @@ export const accessoriesKeys = {
 };
 
 export function useAccessories(params: UseAccessoriesParams = {}) {
-  const { search = '', category = '', page = 1, limit = 24 } = params;
+  const { search = '', category = '', page = 1, limit = 12 } = params;
 
   const qs = new URLSearchParams();
   if (search) qs.append('search', search);
@@ -72,7 +72,7 @@ export const combosKeys = {
 };
 
 export function useCombos(params: UseCombosParams = {}) {
-  const { search = '', page = 1, limit = 24 } = params;
+  const { search = '', page = 1, limit = 12 } = params;
 
   const qs = new URLSearchParams();
   if (search) qs.append('search', search);

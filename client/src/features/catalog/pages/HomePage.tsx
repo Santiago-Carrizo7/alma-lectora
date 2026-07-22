@@ -7,6 +7,7 @@ import { useCart } from '../../../hooks/useCart';
 import { formatPrice } from '../../../services/price';
 import { Spinner } from '../../../components/ui/Spinner';
 import { Button } from '../../../components/ui/Button';
+import { SEOHead } from '../../../components/ui/SEOHead';
 import type { Book } from '../../../types/api';
 
 // Componente para renderizar la cabecera e intercambiar la grilla (Mobile) por el Carrusel (Desktop)
@@ -71,6 +72,7 @@ function AccessoryCard({ acc, onAdd }: { acc: any; onAdd: (acc: any) => void }) 
             src={acc.coverUrl}
             alt={acc.title}
             loading="lazy"
+            decoding="async"
             className={`object-cover w-full h-full transition-transform duration-500 group-hover:scale-105 ${
               isOutOfStock ? 'grayscale opacity-40' : ''
             }`}
@@ -105,6 +107,7 @@ function AccessoryCard({ acc, onAdd }: { acc: any; onAdd: (acc: any) => void }) 
             size="sm"
             onClick={isOutOfStock ? undefined : () => onAdd(acc)}
             disabled={isOutOfStock}
+            aria-label={isOutOfStock ? `${acc.title} está agotado` : `Agregar ${acc.title} al carrito`}
             className="text-xs py-1 px-2.5"
           >
             {isOutOfStock ? 'Agotado' : 'Agregar'}
@@ -125,6 +128,7 @@ function ComboCard({ combo, onAdd }: { combo: any; onAdd: (combo: any) => void }
             src={combo.coverUrl}
             alt={combo.title}
             loading="lazy"
+            decoding="async"
             className="object-cover w-full h-full transition-transform duration-500 group-hover:scale-105"
           />
         ) : (
@@ -144,6 +148,7 @@ function ComboCard({ combo, onAdd }: { combo: any; onAdd: (combo: any) => void }
           <Button
             size="sm"
             onClick={() => onAdd(combo)}
+            aria-label={`Agregar combo ${combo.title} al carrito`}
             className="text-xs py-1 px-2.5 font-semibold"
           >
             Agregar
@@ -208,47 +213,49 @@ function InfiniteBookCarousel({ books, onViewDetail }: { books: Book[]; onViewDe
       setTranslateX(0);
       setTimeout(() => {
         setIsTransitioning(false);
-      }, 500);
-    }, 50);
+      }, 20);
+    }, 20);
   };
 
   return (
-    <div className="relative w-full py-4 group">
-      <div className="absolute top-0 bottom-0 left-0 w-8 sm:w-16 bg-gradient-to-r from-paper to-transparent z-10 pointer-events-none" />
-      <div className="absolute top-0 bottom-0 right-0 w-8 sm:w-16 bg-gradient-to-l from-paper to-transparent z-10 pointer-events-none" />
-
+    <div className="relative group/carousel">
+      {/* Botón Izquierda */}
       <button
         onClick={handlePrev}
-        className="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-paper/90 border border-paper-dark text-ink shadow-md flex items-center justify-center hover:bg-forest hover:text-white transition-all cursor-pointer opacity-0 group-hover:opacity-100 duration-300 hover:scale-105"
-        aria-label="Anterior"
+        disabled={isTransitioning}
+        aria-label="Ver libros anteriores"
+        className="absolute -left-4 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-paper border border-stone-200 text-ink shadow-md flex items-center justify-center hover:bg-forest hover:text-white hover:border-forest transition-all duration-200 opacity-0 group-hover/carousel:opacity-100 disabled:opacity-30 cursor-pointer"
       >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
         </svg>
       </button>
 
-      <button
-        onClick={handleNext}
-        className="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-paper/90 border border-paper-dark text-ink shadow-md flex items-center justify-center hover:bg-forest hover:text-white transition-all cursor-pointer opacity-0 group-hover:opacity-100 duration-300 hover:scale-105"
-        aria-label="Siguiente"
-      >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-        </svg>
-      </button>
-
-      <div className="overflow-hidden px-1">
+      {/* Contenedor Visible / Mask */}
+      <div className="overflow-hidden py-4 -my-4">
         <div
-          className={`flex gap-6 ${useTransition ? 'transition-transform duration-500 ease-out' : ''}`}
+          className={`flex gap-6 ${useTransition ? 'transition-transform duration-500 ease-in-out' : ''}`}
           style={{ transform: `translateX(${translateX}rem)` }}
         >
-          {items.map((book, index) => (
-            <div key={`${book.id}-${index}`} className="w-60 flex-shrink-0 flex flex-col">
+          {items.map((book, idx) => (
+            <div key={`${book.id}-${idx}`} className="w-60 shrink-0">
               <BookCard book={book} onViewDetail={onViewDetail} />
             </div>
           ))}
         </div>
       </div>
+
+      {/* Botón Derecha */}
+      <button
+        onClick={handleNext}
+        disabled={isTransitioning}
+        aria-label="Ver libros siguientes"
+        className="absolute -right-4 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-paper border border-stone-200 text-ink shadow-md flex items-center justify-center hover:bg-forest hover:text-white hover:border-forest transition-all duration-200 opacity-0 group-hover/carousel:opacity-100 disabled:opacity-30 cursor-pointer"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
     </div>
   );
 }
@@ -257,19 +264,16 @@ export function HomePage() {
   const { addItem } = useCart();
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
 
-  // Carga paralela de catálogos con límites aumentados para segmentación del lado del cliente
-  const { data: booksData, isLoading: booksLoading } = useBooks({ limit: 100 });
-  const { data: accData, isLoading: accLoading } = useAccessories({ limit: 100 });
-  const { data: combosData, isLoading: combosLoading } = useCombos({ limit: 100 });
+  // Consultas optimizadas y acotadas según requerimientos de performance
+  const { data: bestSellersData, isLoading: bestSellersLoading } = useBooks({ limit: 12, badge: 'Más vendido' });
+  const { data: noveltiesData, isLoading: noveltiesLoading } = useBooks({ limit: 12, badge: 'Novedad' });
+  const { data: accData, isLoading: accLoading } = useAccessories({ limit: 8, category: 'SEPARADORES' });
+  const { data: combosData, isLoading: combosLoading } = useCombos({ limit: 6 });
 
-  const books = booksData?.data ?? [];
-  const accessories = accData?.data ?? [];
+  const bestSellers = bestSellersData?.data ?? [];
+  const novelties = noveltiesData?.data ?? [];
+  const bookmarks = accData?.data ?? [];
   const combos = combosData?.data ?? [];
-
-  // Segmentar colecciones para una Home súper completa
-  const bestSellers = books.filter((b) => b.badge === 'Más vendido');
-  const novelties = books.filter((b) => b.badge === 'Novedad' || b.badge === 'Destacado');
-  const bookmarks = accessories.filter((a) => a.category === 'SEPARADORES');
 
   const handleAddAccessoryToCart = (acc: any) => {
     addItem({
@@ -295,10 +299,14 @@ export function HomePage() {
     });
   };
 
-  const isLoading = booksLoading || accLoading || combosLoading;
+  const isLoading = bestSellersLoading || noveltiesLoading || accLoading || combosLoading;
 
   return (
     <div className="space-y-16 animate-fade-in">
+      <SEOHead
+        title="Alma Lectora | Inicio - Librería Curada"
+        description="Explorá nuestra selección curada de libros y accesorios premium. Armá tu pedido y finalizá la compra directamente por WhatsApp."
+      />
       {/* Editorial Hero Banner */}
       <section className="relative overflow-hidden bg-paper-dark border border-paper-dark rounded-xl py-14 px-6 sm:px-12 text-center sm:text-left shadow-sm">
         <div className="max-w-2xl space-y-4">

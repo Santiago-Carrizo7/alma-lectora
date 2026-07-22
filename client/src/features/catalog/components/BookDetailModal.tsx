@@ -115,6 +115,7 @@ export function BookDetailModal({ book, onClose }: BookDetailModalProps) {
               size="lg"
               onClick={handleAddToCart}
               disabled={isOutOfStock}
+              aria-label={isOutOfStock ? `${book.title} está agotado` : `Agregar ${book.title} al carrito`}
               className="w-full sm:w-auto font-semibold flex items-center justify-center gap-2 py-3 px-6 cursor-pointer"
             >
               {isOutOfStock ? (

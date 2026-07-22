@@ -5,6 +5,7 @@ import { BookDetailModal } from '../components/BookDetailModal';
 import { SearchBar } from '../components/SearchBar';
 import { FilterChips } from '../components/FilterChips';
 import { Spinner } from '../../../components/ui/Spinner';
+import { SEOHead } from '../../../components/ui/SEOHead';
 import type { Book } from '../../../types/api';
 
 export function BooksPage() {
@@ -43,6 +44,10 @@ export function BooksPage() {
 
   return (
     <div className="space-y-8 animate-fade-in">
+      <SEOHead
+        title="Nuestros Libros | Alma Lectora"
+        description="Explorá nuestra biblioteca completa de libros. Filtrá por tu género favorito o usá el buscador para encontrar tu próxima lectura."
+      />
       <div className="text-center max-w-xl mx-auto space-y-2">
         <h1 className="text-3xl sm:text-4xl font-bold font-serif text-ink tracking-tight">Nuestros Libros</h1>
         <p className="text-sm text-stone-500 font-sans">
