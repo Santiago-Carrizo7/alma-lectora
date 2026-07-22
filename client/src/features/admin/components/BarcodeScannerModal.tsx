@@ -17,36 +17,43 @@ export function BarcodeScannerModal({ isOpen, onClose, onScanSuccess }: BarcodeS
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const isStoppingRef = useRef(false);
+  const isFirstStartRef = useRef(true);
 
-  // Fetch cameras on open
+  // Stop scanner and release all hardware video tracks cleanly
+  const stopScanner = async () => {
+    if (scannerRef.current && !isStoppingRef.current) {
+      isStoppingRef.current = true;
+      try {
+        await scannerRef.current.stop();
+        scannerRef.current.clear();
+      } catch (err) {
+        console.error('[Scanner Stop Error]', err);
+      } finally {
+        // Explicit MediaStreamTracks cleanup to release hardware lock on mobile
+        try {
+          const videoElements = document.querySelectorAll<HTMLVideoElement>('#fullscreen-scanner-reader video');
+          videoElements.forEach((video) => {
+            if (video.srcObject && 'getTracks' in (video.srcObject as MediaStream)) {
+              (video.srcObject as MediaStream).getTracks().forEach((track) => track.stop());
+            }
+          });
+        } catch (_) {}
+
+        scannerRef.current = null;
+        isStoppingRef.current = false;
+      }
+    }
+  };
+
+  // Reset lifecycle on modal open/close
   useEffect(() => {
-    if (!isOpen) return;
-
-    Html5Qrcode.getCameras()
-      .then((devices) => {
-        if (devices && devices.length > 0) {
-          setCameras(devices);
-
-          // Buscar preferentemente la cámara trasera principal (evitando ultrawide/0.5x/front)
-          const preferredRear = devices.find((device) => {
-            const label = device.label.toLowerCase();
-            const isRear = label.includes('back') || label.includes('rear') || label.includes('trasera') || label.includes('0');
-            const isUltraWide = label.includes('ultra') || label.includes('wide') || label.includes('0.5') || label.includes('macro');
-            return isRear && !isUltraWide;
-          }) || devices.find((device) => {
-            const label = device.label.toLowerCase();
-            return !label.includes('front') && !label.includes('selfie');
-          }) || devices[0];
-
-          setSelectedCameraId(preferredRear.id);
-        } else {
-          setErrorMsg('No se detectaron cámaras en tu dispositivo.');
-        }
-      })
-      .catch((err) => {
-        console.error('[getCameras Error]', err);
-        setErrorMsg('No se pudo acceder a la lista de cámaras. Verificá los permisos del navegador.');
-      });
+    if (isOpen) {
+      setErrorMsg(null);
+      setIsTorchOn(false);
+      isFirstStartRef.current = true;
+    } else {
+      stopScanner();
+    }
   }, [isOpen]);
 
   // Start scanner lifecycle
@@ -66,7 +73,8 @@ export function BarcodeScannerModal({ isOpen, onClose, onScanSuccess }: BarcodeS
         scannerRef.current = scanner;
         isStoppingRef.current = false;
 
-        const cameraConfig = selectedCameraId
+        // Cold start: always use generic environment facing mode to prevent NotReadableError hardware locks
+        const cameraConfig = selectedCameraId && !isFirstStartRef.current
           ? { deviceId: { exact: selectedCameraId } }
           : { facingMode: 'environment' };
 
@@ -83,14 +91,12 @@ export function BarcodeScannerModal({ isOpen, onClose, onScanSuccess }: BarcodeS
           (decodedText) => {
             if (!isMounted) return;
 
-            // Vibración háptica al escanear
             if (typeof window !== 'undefined' && 'vibrate' in navigator) {
               try {
                 navigator.vibrate?.([80, 40, 80]);
               } catch (_) {}
             }
 
-            // Detener y retornar
             stopScanner().then(() => {
               onScanSuccess(decodedText);
               onClose();
@@ -98,6 +104,22 @@ export function BarcodeScannerModal({ isOpen, onClose, onScanSuccess }: BarcodeS
           },
           () => {}
         );
+
+        if (!isMounted) return;
+        isFirstStartRef.current = false;
+
+        // Fetch camera devices after stream is successfully running to populate select without locking hardware
+        if (cameras.length === 0) {
+          Html5Qrcode.getCameras()
+            .then((devices) => {
+              if (isMounted && devices && devices.length > 0) {
+                setCameras(devices);
+              }
+            })
+            .catch((err) => {
+              console.warn('[getCameras Warning]', err);
+            });
+        }
 
         // Check torch support
         try {
@@ -125,21 +147,6 @@ export function BarcodeScannerModal({ isOpen, onClose, onScanSuccess }: BarcodeS
     };
   }, [isOpen, selectedCameraId]);
 
-  const stopScanner = async () => {
-    if (scannerRef.current && !isStoppingRef.current) {
-      isStoppingRef.current = true;
-      try {
-        await scannerRef.current.stop();
-        scannerRef.current.clear();
-      } catch (err) {
-        console.error('[Scanner Stop Error]', err);
-      } finally {
-        scannerRef.current = null;
-        isStoppingRef.current = false;
-      }
-    }
-  };
-
   const handleToggleTorch = async () => {
     if (!scannerRef.current || !hasTorchSupport) return;
     try {
@@ -155,6 +162,7 @@ export function BarcodeScannerModal({ isOpen, onClose, onScanSuccess }: BarcodeS
 
   const handleCameraChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newId = e.target.value;
+    isFirstStartRef.current = false;
     stopScanner().then(() => {
       setSelectedCameraId(newId);
       setIsTorchOn(false);

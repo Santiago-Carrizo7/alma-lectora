@@ -1,20 +1,51 @@
+import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useStoreConfig } from '../../features/admin/hooks/config.queries';
 
 const FALLBACK_IG = 'https://www.instagram.com/alma.lectora.al/?hl=es-la';
 
 export function InstagramFAB() {
+  const location = useLocation();
   const { data } = useStoreConfig();
   const href = data?.instagramUrl ?? FALLBACK_IG;
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Monitor DOM body style attribute for modal/drawer overflow lock
+  useEffect(() => {
+    const checkModalOpen = () => {
+      setIsModalOpen(document.body.style.overflow === 'hidden');
+    };
+
+    checkModalOpen();
+
+    const observer = new MutationObserver(checkModalOpen);
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['style'],
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  // Hide condition A: Admin Panel
+  if (location.pathname.startsWith('/admin')) {
+    return null;
+  }
+
+  // Hide condition B: Modal or Drawer active
+  if (isModalOpen) {
+    return null;
+  }
 
   return (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="fixed bottom-6 left-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-tr from-amber-500 via-purple-600 to-indigo-600 text-white shadow-lg hover:scale-110 hover:shadow-xl transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-purple-600 focus:ring-offset-2"
+      className="fixed bottom-6 left-6 z-40 hidden sm:flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-tr from-amber-500 via-purple-600 to-indigo-600 text-white shadow-lg hover:scale-110 hover:shadow-xl transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-purple-600 focus:ring-offset-2"
       aria-label="Seguinos en Instagram"
     >
-
       <svg
         className="h-7 w-7"
         fill="currentColor"
