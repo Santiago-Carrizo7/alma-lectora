@@ -4,6 +4,10 @@ export const getCombosQuerySchema = z.object({
   search: z.string().optional(),
   page: z.string().regex(/^\d+$/).transform(Number).optional(),
   limit: z.string().regex(/^\d+$/).transform(Number).optional(),
+  isActive: z.preprocess(
+    (val) => (val === 'true' ? true : val === 'false' ? false : val),
+    z.boolean().optional()
+  ),
 });
 
 export const createComboSchema = z.object({

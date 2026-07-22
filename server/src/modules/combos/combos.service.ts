@@ -4,10 +4,15 @@ import { AdminService } from '../admin/admin.service.js';
 
 export class CombosService {
   static async getCombos(query: GetCombosQuery) {
-    const { search, page = 1, limit = 24 } = query;
+    const { search, page = 1, limit = 24, isActive } = query;
     const skip = (page - 1) * limit;
 
-    const where: any = { isActive: true };
+    const where: any = {};
+    if (isActive !== undefined) {
+      where.isActive = isActive;
+    } else {
+      where.isActive = true;
+    }
 
     if (search) {
       where.OR = [
