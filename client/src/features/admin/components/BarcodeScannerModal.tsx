@@ -17,7 +17,6 @@ export function BarcodeScannerModal({ isOpen, onClose, onScanSuccess }: BarcodeS
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const isStoppingRef = useRef(false);
-  const isFirstStartRef = useRef(true);
 
   // Stop scanner and release all hardware video tracks cleanly
   const stopScanner = async () => {
@@ -45,18 +44,23 @@ export function BarcodeScannerModal({ isOpen, onClose, onScanSuccess }: BarcodeS
     }
   };
 
-  // Reset lifecycle on modal open/close
+  // Lock body scroll when modal is open, restore on close
   useEffect(() => {
     if (isOpen) {
       setErrorMsg(null);
       setIsTorchOn(false);
-      isFirstStartRef.current = true;
+      document.body.style.overflow = 'hidden';
     } else {
       stopScanner();
+      document.body.style.overflow = 'unset';
     }
+
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
   }, [isOpen]);
 
-  // Start scanner lifecycle
+  // Unified camera detection & 1X lens selection lifecycle
   useEffect(() => {
     let isMounted = true;
     if (!isOpen) return;
@@ -65,6 +69,51 @@ export function BarcodeScannerModal({ isOpen, onClose, onScanSuccess }: BarcodeS
 
     const timer = setTimeout(async () => {
       try {
+        // 1. Detect available cameras
+        let devices: CameraDevice[] = [];
+        try {
+          devices = await Html5Qrcode.getCameras();
+          if (isMounted && devices && devices.length > 0) {
+            setCameras(devices);
+          }
+        } catch (err) {
+          console.warn('[getCameras Warning]', err);
+        }
+
+        if (!isMounted) return;
+
+        // 2. Filter 1X Main Rear Camera Sensor
+        let targetCameraId = selectedCameraId;
+
+        if (!targetCameraId && devices && devices.length > 0) {
+          // Filter rear cameras excluding front / selfie labels
+          const rearCameras = devices.filter((d) => {
+            const label = d.label.toLowerCase();
+            return !label.includes('front') && !label.includes('selfie') && !label.includes('user');
+          });
+
+          const candidates = rearCameras.length > 0 ? rearCameras : devices;
+
+          // Main 1X sensor selection logic: exclude ultra wide, 0.5x, macro, depth
+          const mainRear = candidates.find((d) => {
+            const label = d.label.toLowerCase();
+            const isRearWord = label.includes('back') || label.includes('rear') || label.includes('trasera') || label.includes('0');
+            const isWideOrMacro = label.includes('ultra') || label.includes('wide') || label.includes('0.5') || label.includes('macro') || label.includes('depth');
+            return isRearWord && !isWideOrMacro;
+          }) || candidates.find((d) => {
+            const label = d.label.toLowerCase();
+            return !label.includes('ultra') && !label.includes('wide') && !label.includes('0.5') && !label.includes('macro') && !label.includes('depth');
+          }) || (rearCameras.length > 0 ? rearCameras[rearCameras.length - 1] : devices[0]);
+
+          targetCameraId = mainRear.id;
+          setSelectedCameraId(targetCameraId);
+        }
+
+        // 3. Configure camera constraints
+        const cameraConfig = targetCameraId
+          ? { deviceId: { exact: targetCameraId } }
+          : { facingMode: 'environment' };
+
         const scanner = new Html5Qrcode(elementId, {
           formatsToSupport: [Html5QrcodeSupportedFormats.EAN_13],
           verbose: false,
@@ -73,11 +122,7 @@ export function BarcodeScannerModal({ isOpen, onClose, onScanSuccess }: BarcodeS
         scannerRef.current = scanner;
         isStoppingRef.current = false;
 
-        // Cold start: always use generic environment facing mode to prevent NotReadableError hardware locks
-        const cameraConfig = selectedCameraId && !isFirstStartRef.current
-          ? { deviceId: { exact: selectedCameraId } }
-          : { facingMode: 'environment' };
-
+        // 4. Start stream
         await scanner.start(
           cameraConfig,
           {
@@ -106,22 +151,8 @@ export function BarcodeScannerModal({ isOpen, onClose, onScanSuccess }: BarcodeS
         );
 
         if (!isMounted) return;
-        isFirstStartRef.current = false;
 
-        // Fetch camera devices after stream is successfully running to populate select without locking hardware
-        if (cameras.length === 0) {
-          Html5Qrcode.getCameras()
-            .then((devices) => {
-              if (isMounted && devices && devices.length > 0) {
-                setCameras(devices);
-              }
-            })
-            .catch((err) => {
-              console.warn('[getCameras Warning]', err);
-            });
-        }
-
-        // Check torch support
+        // 5. Check torch capability
         try {
           const capabilities = scanner.getRunningTrackCapabilities();
           if (capabilities && (capabilities as any).torch) {
@@ -162,7 +193,6 @@ export function BarcodeScannerModal({ isOpen, onClose, onScanSuccess }: BarcodeS
 
   const handleCameraChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newId = e.target.value;
-    isFirstStartRef.current = false;
     stopScanner().then(() => {
       setSelectedCameraId(newId);
       setIsTorchOn(false);
@@ -172,12 +202,27 @@ export function BarcodeScannerModal({ isOpen, onClose, onScanSuccess }: BarcodeS
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black text-stone-100 flex flex-col justify-between overflow-hidden animate-fade-in">
-      {/* Header */}
-      <div className="relative z-20 flex items-center justify-between p-4 bg-gradient-to-b from-black/90 to-transparent">
+    <div className="fixed inset-0 z-[100] w-screen h-[100dvh] bg-black text-stone-100 flex flex-col justify-between overflow-hidden animate-fade-in select-none">
+      {/* Force video tag to fill screen via object-cover */}
+      <style>{`
+        #fullscreen-scanner-reader {
+          width: 100% !important;
+          height: 100% !important;
+          position: absolute !important;
+          inset: 0 !important;
+        }
+        #fullscreen-scanner-reader video {
+          width: 100% !important;
+          height: 100% !important;
+          object-fit: cover !important;
+        }
+      `}</style>
+
+      {/* Top Floating Header */}
+      <div className="relative z-20 flex items-center justify-between p-4 bg-gradient-to-b from-black/90 via-black/40 to-transparent pt-safe">
         <div className="flex items-center gap-2">
-          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-          <h2 className="text-sm font-bold tracking-wide uppercase font-serif">
+          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_#10b981]" />
+          <h2 className="text-xs sm:text-sm font-bold tracking-wider uppercase font-serif text-stone-200">
             Escáner de Código EAN-13
           </h2>
         </div>
@@ -186,8 +231,8 @@ export function BarcodeScannerModal({ isOpen, onClose, onScanSuccess }: BarcodeS
           onClick={() => {
             stopScanner().then(onClose);
           }}
-          className="p-2 rounded-full bg-stone-800/80 hover:bg-stone-700 text-stone-200 transition-colors cursor-pointer"
-          title="Cerrar escáner"
+          className="p-2 rounded-full bg-stone-900/80 hover:bg-stone-800 text-stone-200 transition-all active:scale-95 cursor-pointer border border-stone-700/50"
+          aria-label="Cerrar escáner"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -195,48 +240,50 @@ export function BarcodeScannerModal({ isOpen, onClose, onScanSuccess }: BarcodeS
         </button>
       </div>
 
-      {/* Main Viewport Container */}
-      <div className="relative flex-1 flex items-center justify-center bg-black overflow-hidden">
-        <div id="fullscreen-scanner-reader" className="w-full h-full object-cover" />
+      {/* Main Viewport Container & HUD Overlay */}
+      <div className="relative flex-1 w-full h-full flex items-center justify-center bg-black overflow-hidden">
+        {/* html5-qrcode Video Container */}
+        <div id="fullscreen-scanner-reader" />
 
-        {/* HUD Scanner Visual Overlay */}
+        {/* HUD Visual Viewfinder Overlay */}
         <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center z-10">
-          {/* Top/Bottom Dark Backdrop */}
-          <div className="absolute top-0 left-0 right-0 bottom-0 border-[40px] sm:border-[80px] border-black/60 backdrop-blur-[1px] flex items-center justify-center">
-            {/* Center Frame */}
-            <div className="relative w-[85%] max-w-[340px] h-[180px] border-2 border-emerald-500/80 rounded-xl shadow-[0_0_20px_rgba(16,185,129,0.3)] flex flex-col justify-between p-2">
+          {/* Outer Backdrop Mask */}
+          <div className="absolute inset-0 border-[30px] sm:border-[60px] md:border-[100px] border-black/60 backdrop-blur-[1px] flex items-center justify-center">
+            {/* Center Viewfinder Box */}
+            <div className="relative w-[85%] max-w-[340px] h-[180px] border-2 border-emerald-500/90 rounded-2xl shadow-[0_0_30px_rgba(16,185,129,0.4)] flex flex-col justify-between p-2">
               {/* Corner crosshairs */}
-              <div className="absolute -top-1 -left-1 w-5 h-5 border-t-4 border-l-4 border-emerald-400 rounded-tl" />
-              <div className="absolute -top-1 -right-1 w-5 h-5 border-t-4 border-r-4 border-emerald-400 rounded-tr" />
-              <div className="absolute -bottom-1 -left-1 w-5 h-5 border-b-4 border-l-4 border-emerald-400 rounded-bl" />
-              <div className="absolute -bottom-1 -right-1 w-5 h-5 border-b-4 border-r-4 border-emerald-400 rounded-br" />
+              <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-emerald-400 rounded-tl-lg" />
+              <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-emerald-400 rounded-tr-lg" />
+              <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-emerald-400 rounded-bl-lg" />
+              <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-emerald-400 rounded-br-lg" />
 
-              {/* Animated Laser Line */}
-              <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_12px_#34d399] animate-pulse my-auto" />
+              {/* Animated Emerald Laser Line */}
+              <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_15px_#34d399] animate-pulse my-auto" />
             </div>
           </div>
 
-          {/* Instructions */}
-          <div className="absolute bottom-6 text-center px-4">
-            <p className="text-xs font-semibold text-stone-200 bg-stone-900/80 backdrop-blur px-4 py-2 rounded-full border border-stone-700/60 shadow-lg">
-              Alineá el código de barras dentro del recuadro verde
+          {/* Floating Instructions Banner */}
+          <div className="absolute bottom-8 text-center px-4 z-20">
+            <p className="text-xs font-semibold text-stone-200 bg-stone-900/90 backdrop-blur-md px-5 py-2.5 rounded-full border border-stone-700/80 shadow-2xl tracking-wide">
+              Centrá el código de barras dentro del recuadro verde
             </p>
           </div>
         </div>
 
+        {/* Error Overlay */}
         {errorMsg && (
-          <div className="absolute z-30 inset-x-6 top-1/2 -translate-y-1/2 bg-red-950/90 border border-red-500 text-red-100 p-6 rounded-2xl text-center space-y-4 shadow-2xl">
+          <div className="absolute z-30 inset-x-6 top-1/2 -translate-y-1/2 bg-red-950/95 border border-red-500 text-red-100 p-6 rounded-2xl text-center space-y-4 shadow-2xl backdrop-blur-md">
             <svg className="w-10 h-10 text-red-400 mx-auto" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
             </svg>
-            <p className="text-sm font-medium">{errorMsg}</p>
+            <p className="text-sm font-medium leading-relaxed">{errorMsg}</p>
             <Button
               variant="danger"
               size="sm"
               onClick={() => {
                 stopScanner().then(onClose);
               }}
-              className="w-full py-2 font-bold"
+              className="w-full py-2 font-bold cursor-pointer"
             >
               Cerrar
             </Button>
@@ -244,8 +291,8 @@ export function BarcodeScannerModal({ isOpen, onClose, onScanSuccess }: BarcodeS
         )}
       </div>
 
-      {/* Footer Toolbar: Controls */}
-      <div className="relative z-20 p-4 bg-stone-900/90 border-t border-stone-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+      {/* Floating Bottom Toolbar */}
+      <div className="relative z-20 p-4 bg-gradient-to-t from-black via-black/90 to-transparent flex flex-col sm:flex-row items-center justify-between gap-3 pb-safe">
         {/* Selector de Cámaras */}
         {cameras.length > 1 ? (
           <div className="w-full sm:w-auto flex items-center gap-2">
@@ -255,7 +302,7 @@ export function BarcodeScannerModal({ isOpen, onClose, onScanSuccess }: BarcodeS
             <select
               value={selectedCameraId}
               onChange={handleCameraChange}
-              className="flex-1 bg-stone-800 border border-stone-700 text-stone-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              className="flex-1 bg-stone-900/90 border border-stone-700/80 text-stone-200 text-xs rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
             >
               {cameras.map((cam, idx) => (
                 <option key={cam.id} value={cam.id}>
@@ -266,20 +313,20 @@ export function BarcodeScannerModal({ isOpen, onClose, onScanSuccess }: BarcodeS
           </div>
         ) : (
           <div className="text-xs text-stone-400">
-            Cámara activa: Standard
+            Cámara 1X Principal
           </div>
         )}
 
         {/* Linterna / Cancelar */}
-        <div className="w-full sm:w-auto flex items-center justify-end gap-2">
+        <div className="w-full sm:w-auto flex items-center justify-end gap-3">
           {hasTorchSupport && (
             <button
               type="button"
               onClick={handleToggleTorch}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
+              className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
                 isTorchOn
-                  ? 'bg-amber-400 text-stone-950 border-amber-300 shadow-[0_0_10px_rgba(251,191,36,0.5)]'
-                  : 'bg-stone-800 text-stone-300 border-stone-700 hover:bg-stone-700'
+                  ? 'bg-amber-400 text-stone-950 border-amber-300 shadow-[0_0_12px_rgba(251,191,36,0.6)]'
+                  : 'bg-stone-900/90 text-stone-300 border-stone-700/80 hover:bg-stone-800'
               }`}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -295,7 +342,7 @@ export function BarcodeScannerModal({ isOpen, onClose, onScanSuccess }: BarcodeS
             onClick={() => {
               stopScanner().then(onClose);
             }}
-            className="text-xs py-2 px-4 border border-stone-700 text-stone-300 font-semibold"
+            className="text-xs py-2.5 px-5 border border-stone-700/80 text-stone-300 font-semibold rounded-xl hover:bg-stone-800"
           >
             Cancelar
           </Button>
