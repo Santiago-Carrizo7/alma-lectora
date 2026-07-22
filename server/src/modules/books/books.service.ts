@@ -615,20 +615,103 @@ export class BooksService {
   }
 
   /**
-   * Translates a synopsis to Spanish using MyMemory API.
-   * Returns the original text on any failure (graceful).
+   * Cleans HTML formatting, removes duplicated multilanguage sections (Spanish / English),
+   * and translates non-Spanish synopses cleanly to Spanish without appending original English text.
    */
-  private static async translateSynopsis(text: string, sourceLang: string): Promise<string> {
+  private static async processSynopsis(rawSynopsis: string | null | undefined, lang: string | null | undefined): Promise<string | null> {
+    if (!rawSynopsis || rawSynopsis.trim().length === 0) {
+      return null;
+    }
+
+    // 1. Unescape HTML entities & strip HTML tags (<p>, <br>, <b>, <i>, etc.)
+    let cleaned = rawSynopsis
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/p>/gi, '\n\n')
+      .replace(/<[^>]*>/g, '')
+      .replace(/\n\s*\n+/g, '\n\n')
+      .trim();
+
+    if (!cleaned) return null;
+
+    // 2. Detect & remove duplicate English/Spanish blocks if the source description contains both
+    const englishMarkers = [
+      /\benglish version\b/i,
+      /\bdescription in english\b/i,
+      /\boriginal synopsis\b/i,
+      /\babout the author\b/i,
+      /\bsynopsis in english\b/i,
+    ];
+
+    for (const marker of englishMarkers) {
+      const match = cleaned.match(marker);
+      if (match && match.index !== undefined && match.index > 50) {
+        cleaned = cleaned.substring(0, match.index).trim();
+        break;
+      }
+    }
+
+    // 3. If the synopsis language is Spanish or contains Spanish indicators, return clean text directly
+    const isSpanish = lang === 'es' || /[\u00C0-\u024F]/.test(cleaned) || /\b(el|la|los|las|un|una|con|por|para|sobre|historia|libro|novela)\b/i.test(cleaned);
+    
+    if (isSpanish) {
+      return cleaned;
+    }
+
+    // 4. Translate English/foreign text to Spanish in chunks of max 450 chars to avoid MyMemory API limits
     try {
-      const encoded = encodeURIComponent(text.substring(0, 500));
-      const url = `https://api.mymemory.translated.net/get?q=${encoded}&langpair=${sourceLang}|es`;
-      const response = await fetch(url);
-      if (!response.ok) return text;
-      const data = (await response.json()) as { responseData?: { translatedText?: string } };
-      const translated = data.responseData?.translatedText;
-      return translated && translated.trim().length > 0 ? translated : text;
-    } catch {
-      return text;
+      const paragraphs = cleaned.split('\n\n').filter((p) => p.trim().length > 0);
+      const translatedParagraphs: string[] = [];
+
+      for (const p of paragraphs) {
+        const chunks: string[] = [];
+        let remaining = p.trim();
+        while (remaining.length > 0) {
+          if (remaining.length <= 450) {
+            chunks.push(remaining);
+            break;
+          }
+          let cutIndex = remaining.lastIndexOf('.', 450);
+          if (cutIndex === -1 || cutIndex < 150) {
+            cutIndex = remaining.lastIndexOf(' ', 450);
+          }
+          if (cutIndex === -1) {
+            cutIndex = 450;
+          }
+          chunks.push(remaining.substring(0, cutIndex + 1).trim());
+          remaining = remaining.substring(cutIndex + 1).trim();
+        }
+
+        const translatedChunks: string[] = [];
+        for (const chunk of chunks) {
+          const encoded = encodeURIComponent(chunk);
+          const source = lang && lang !== 'es' ? lang : 'en';
+          const url = `https://api.mymemory.translated.net/get?q=${encoded}&langpair=${source}|es`;
+          const response = await fetch(url);
+          if (response.ok) {
+            const data = (await response.json()) as { responseData?: { translatedText?: string } };
+            const transText = data.responseData?.translatedText;
+            if (transText && transText.trim().length > 0) {
+              translatedChunks.push(transText.trim());
+            } else {
+              translatedChunks.push(chunk);
+            }
+          } else {
+            translatedChunks.push(chunk);
+          }
+        }
+        translatedParagraphs.push(translatedChunks.join(' '));
+      }
+
+      const finalTranslated = translatedParagraphs.join('\n\n').trim();
+      return finalTranslated.length > 0 ? finalTranslated : cleaned;
+    } catch (err) {
+      console.error('[BooksService:processSynopsis:Error]', err);
+      return cleaned;
     }
   }
 
@@ -683,9 +766,7 @@ export class BooksService {
 
     const rawSynopsis = info.description ?? null;
     const lang = info.language ?? null;
-    const synopsis = rawSynopsis && lang && lang !== 'es'
-      ? await this.translateSynopsis(rawSynopsis, lang)
-      : rawSynopsis;
+    const synopsis = await this.processSynopsis(rawSynopsis, lang);
 
     return {
       title: info.title ?? null,
@@ -762,9 +843,7 @@ export class BooksService {
 
     const rawSynopsis = info.description ?? null;
     const lang = info.language ?? null;
-    const synopsis = rawSynopsis && lang && lang !== 'es'
-      ? await this.translateSynopsis(rawSynopsis, lang)
-      : rawSynopsis;
+    const synopsis = await this.processSynopsis(rawSynopsis, lang);
 
     return {
       title: info.title ?? null,
@@ -895,9 +974,7 @@ export class BooksService {
 
     const rawSynopsis = info.description ?? null;
     const lang = info.language ?? null;
-    const synopsis = rawSynopsis && lang && lang !== 'es'
-      ? await this.translateSynopsis(rawSynopsis, lang)
-      : rawSynopsis;
+    const synopsis = await this.processSynopsis(rawSynopsis, lang);
 
     return {
       title: info.title ?? null,
@@ -955,13 +1032,14 @@ export class BooksService {
       ? info.authors.map((a) => a.name)
       : [];
     const coverUrl = info.cover?.large || info.cover?.medium || info.cover?.small || null;
+    const synopsis = await this.processSynopsis(info.notes, null);
 
     return {
       title: info.title || null,
       originalTitle: info.title || null,
       googleBooksId: null,
       authors: authorNames,
-      synopsis: info.notes || null,
+      synopsis,
       coverUrl: coverUrl ? coverUrl.replace(/^http:/, 'https:') : null,
       publishedDate: info.publish_date || null,
       language: null,

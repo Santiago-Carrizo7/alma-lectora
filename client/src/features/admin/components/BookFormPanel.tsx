@@ -103,7 +103,19 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
       setTitle(bookData.title);
       setOriginalTitle(bookData.originalTitle || '');
       setGoogleBooksId(bookData.googleBooksId || '');
-      setAuthorsText(bookData.authors ? bookData.authors.map((a) => a.name).join(', ') : '');
+      
+      const formattedAuthors = bookData.authors && Array.isArray(bookData.authors)
+        ? bookData.authors
+            .map((a: any) => {
+              if (!a) return '';
+              if (typeof a === 'string') return a;
+              return a.name || a.author?.name || '';
+            })
+            .filter(Boolean)
+            .join(', ')
+        : '';
+
+      setAuthorsText(formattedAuthors);
       setSynopsis(bookData.synopsis || '');
       setCoverUrl(bookData.coverUrl || '');
       setPreviewUrl(bookData.coverUrl || null);
