@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { apiClient } from '../../../services/api-client';
 import { Button } from '../../../components/ui/Button';
 import { Spinner } from '../../../components/ui/Spinner';
@@ -8,6 +7,7 @@ import { useBookById } from '../hooks/admin.queries';
 import { useCreateBook, useUpdateBook } from '../hooks/admin.mutations';
 import { useToast } from '../../../components/ui/Toast';
 import { compressImage } from '../../../services/image-compressor';
+import { BarcodeScannerModal } from './BarcodeScannerModal';
 
 interface BookFormPanelProps {
   mode: 'create' | 'edit';
@@ -22,7 +22,7 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
   const [title, setTitle] = useState('');
   const [originalTitle, setOriginalTitle] = useState('');
   const [googleBooksId, setGoogleBooksId] = useState('');
-  const [authors, setAuthors] = useState<string[]>([]);
+  const [authorsText, setAuthorsText] = useState('');
   const [synopsis, setSynopsis] = useState('');
   const [coverUrl, setCoverUrl] = useState('');
   const [price, setPrice] = useState('');
@@ -44,7 +44,6 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
   // Scanner states
   const [isScanning, setIsScanning] = useState(false);
   const [lookupLoading, setLookupLoading] = useState(false);
-  const scannerRef = useRef<Html5Qrcode | null>(null);
 
   // Queries and mutations
   const { data: bookData, isLoading: isBookLoading } = useBookById(id || '');
@@ -104,7 +103,7 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
       setTitle(bookData.title);
       setOriginalTitle(bookData.originalTitle || '');
       setGoogleBooksId(bookData.googleBooksId || '');
-      setAuthors(bookData.authors ? bookData.authors.map((a) => a.name) : []);
+      setAuthorsText(bookData.authors ? bookData.authors.map((a) => a.name).join(', ') : '');
       setSynopsis(bookData.synopsis || '');
       setCoverUrl(bookData.coverUrl || '');
       setPreviewUrl(bookData.coverUrl || null);
@@ -117,7 +116,7 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
       setTitle('');
       setOriginalTitle('');
       setGoogleBooksId('');
-      setAuthors([]);
+      setAuthorsText('');
       setSynopsis('');
       setCoverUrl('');
       setPreviewUrl(null);
@@ -165,7 +164,7 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
         setTitle(data.originalTitle || data.title || '');
         setOriginalTitle(data.originalTitle || data.title || '');
         setGoogleBooksId(data.googleBooksId || '');
-        setAuthors(data.authors || []);
+        setAuthorsText(data.authors && data.authors.length > 0 ? data.authors.join(', ') : '');
         setSynopsis(data.synopsis || '');
         setCoverUrl(data.coverUrl || '');
         setPreviewUrl(data.coverUrl || null);
@@ -204,74 +203,10 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
     }
   };
 
-  // HTML5 Barcode scanner lifecycle
-  useEffect(() => {
-    let isMounted = true;
-    let isStopping = false;
-
-    if (isScanning) {
-      const timer = setTimeout(() => {
-        try {
-          const scanner = new Html5Qrcode('reader', {
-            formatsToSupport: [Html5QrcodeSupportedFormats.EAN_13],
-            verbose: false,
-          });
-
-          scanner
-            .start(
-              { facingMode: 'environment' },
-              {
-                fps: 10,
-                qrbox: { width: 280, height: 160 },
-              },
-              async (decodedText) => {
-                if (!isMounted) return;
-                setIsScanning(false);
-                if (scannerRef.current && !isStopping) {
-                  isStopping = true;
-                  try {
-                    await scannerRef.current.stop();
-                  } catch (err) {
-                    console.error('Error stopping scanner', err);
-                  }
-                }
-                scannerRef.current = null;
-                setIsbn(decodedText);
-                await handleIsbnLookup(decodedText);
-              },
-              () => {
-                // quiet error callback
-              }
-            )
-            .then(() => {
-              if (isMounted) {
-                scannerRef.current = scanner;
-              } else {
-                scanner.stop().catch((err) => console.error('Error stopping scanner after unmount', err));
-              }
-            })
-            .catch((err) => {
-              console.error('Error starting html5-qrcode scanner', err);
-              if (isMounted) setIsScanning(false);
-            });
-        } catch (err) {
-          console.error('Error initializing html5-qrcode scanner', err);
-          setIsScanning(false);
-        }
-      }, 100);
-
-      return () => {
-        isMounted = false;
-        clearTimeout(timer);
-        if (scannerRef.current && !isStopping) {
-          isStopping = true;
-          const currentScanner = scannerRef.current;
-          scannerRef.current = null;
-          currentScanner.stop().catch((err) => console.error('Error stopping scanner on cleanup', err));
-        }
-      };
-    }
-  }, [isScanning]);
+  const handleScanSuccess = async (scannedIsbn: string) => {
+    setIsbn(scannedIsbn);
+    await handleIsbnLookup(scannedIsbn);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -303,12 +238,17 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
         finalCoverUrl = res.imageUrl;
       }
 
+      const parsedAuthors = authorsText
+        .split(',')
+        .map((a) => a.trim())
+        .filter(Boolean);
+
       const payload = {
         isbn,
         title,
         originalTitle: originalTitle || null,
         googleBooksId: googleBooksId || null,
-        authors,
+        authors: parsedAuthors,
         synopsis: synopsis || null,
         coverUrl: finalCoverUrl || null,
         price: parseFloat(price),
@@ -380,35 +320,27 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
             <div className="bg-paper-dark/50 border border-paper-dark p-5 rounded-xl space-y-4">
               <h3 className="font-serif font-bold text-lg text-ink">Carga con Escáner</h3>
               <p className="text-xs text-ink-muted leading-relaxed">
-                Pulsá el botón para encender la cámara y escanear el código de barras (EAN-13) de un libro para autocompletar su información.
+                Pulsá el botón para abrir la cámara a pantalla completa y escanear el código de barras (EAN-13) de un libro.
               </p>
 
-              {isScanning ? (
-                <div className="space-y-4">
-                  <div id="reader" className="w-full rounded-lg overflow-hidden border border-stone-300 bg-black/5" />
-                  <Button
-                    variant="danger"
-                    type="button"
-                    onClick={() => setIsScanning(false)}
-                    className="w-full text-xs font-semibold py-2"
-                  >
-                    Cancelar Escaneo
-                  </Button>
-                </div>
-              ) : (
-                <Button
-                  variant="primary"
-                  type="button"
-                  onClick={() => setIsScanning(true)}
-                  className="w-full py-2.5 flex items-center justify-center gap-2 font-serif font-bold text-sm shadow-sm"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 10.5h.008v.008h-.008V10.5Z" />
-                  </svg>
-                  Escanear Código de Barras
-                </Button>
-              )}
+              <Button
+                variant="primary"
+                type="button"
+                onClick={() => setIsScanning(true)}
+                className="w-full py-3 flex items-center justify-center gap-2 font-serif font-bold text-sm shadow-md"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 10.5h.008v.008h-.008V10.5Z" />
+                </svg>
+                Abrir Escáner a Pantalla Completa
+              </Button>
+
+              <BarcodeScannerModal
+                isOpen={isScanning}
+                onClose={() => setIsScanning(false)}
+                onScanSuccess={handleScanSuccess}
+              />
             </div>
           ) : (
             <div className="bg-paper-dark/30 border border-paper-dark p-5 rounded-xl text-center space-y-2">
@@ -493,31 +425,33 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
 
               <div>
                 <label htmlFor="originalTitle" className="block text-xs font-semibold uppercase tracking-wider text-ink mb-1">
-                  Título Original (Google Books)
+                  Título Original
                 </label>
                 <input
                   id="originalTitle"
                   name="originalTitle"
                   type="text"
-                  readOnly
                   value={originalTitle}
-                  className="w-full bg-paper/50 border border-stone-300 rounded p-2 text-ink-muted text-sm focus:outline-none cursor-not-allowed"
+                  onChange={(e) => setOriginalTitle(e.target.value)}
+                  disabled={isMutating || uploadingImage}
+                  className="w-full bg-paper border border-stone-300 rounded p-2 text-ink text-sm focus:ring-1 focus:ring-forest focus:outline-none font-medium"
                   placeholder="Ej: King of Wrath"
                 />
               </div>
 
               <div className="sm:col-span-2">
                 <label htmlFor="authors" className="block text-xs font-semibold uppercase tracking-wider text-ink mb-1">
-                  Autor(es) (No editable)
+                  Autor(es) (separados por coma)
                 </label>
                 <input
                   id="authors"
                   name="authors"
                   type="text"
-                  readOnly
-                  value={authors.join(', ')}
-                  className="w-full bg-paper/50 border border-stone-300 rounded p-2 text-ink-muted text-sm focus:outline-none cursor-not-allowed"
-                  placeholder="No se cargaron autores"
+                  value={authorsText}
+                  onChange={(e) => setAuthorsText(e.target.value)}
+                  disabled={isMutating || uploadingImage}
+                  className="w-full bg-paper border border-stone-300 rounded p-2 text-ink text-sm focus:ring-1 focus:ring-forest focus:outline-none"
+                  placeholder="Ej: Ana Huang, Colleen Hoover"
                 />
               </div>
 
