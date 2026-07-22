@@ -10,7 +10,38 @@ export class AuthController {
     res.cookie('access_token', result.accessToken, {
       httpOnly: true,
       path: '/',
-      maxAge: 15 * 60 * 1000,
+      maxAge: 24 * 60 * 60 * 1000, // 24hs
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    });
+
+    res.cookie('refresh_token', result.refreshToken, {
+      httpOnly: true,
+      path: '/api/v1/auth',
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 días
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    });
+
+    res.status(200).json({ success: true });
+  }
+
+  static async refresh(req: Request, res: Response): Promise<void> {
+    const refreshTokenStr = req.cookies?.refresh_token;
+    const result = await AuthService.refresh(refreshTokenStr);
+
+    res.cookie('access_token', result.accessToken, {
+      httpOnly: true,
+      path: '/',
+      maxAge: 24 * 60 * 60 * 1000, // 24hs
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    });
+
+    res.cookie('refresh_token', result.refreshToken, {
+      httpOnly: true,
+      path: '/api/v1/auth',
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 días
       secure: process.env.NODE_ENV === 'production',
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     });
@@ -22,6 +53,12 @@ export class AuthController {
     res.clearCookie('access_token', {
       httpOnly: true,
       path: '/',
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    });
+    res.clearCookie('refresh_token', {
+      httpOnly: true,
+      path: '/api/v1/auth',
       secure: process.env.NODE_ENV === 'production',
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     });

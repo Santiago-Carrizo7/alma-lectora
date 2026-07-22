@@ -8,5 +8,6 @@ import { loginSchema } from './auth.schemas.js';
 export const authRouter: Router = Router();
 
 authRouter.post('/login', authRateLimiter, validateSchema(loginSchema), AuthController.login);
+authRouter.post('/refresh', AuthController.refresh);
 authRouter.post('/logout', AuthController.logout);
 authRouter.get('/me', requireAuth, AuthController.me);
