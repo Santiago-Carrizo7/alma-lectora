@@ -13,6 +13,12 @@ booksRouter.get(
   BooksController.getBooks
 );
 
+// Public route for sitemap
+booksRouter.get(
+  '/sitemap.xml',
+  BooksController.getSitemap
+);
+
 booksRouter.get(
   '/:id',
   validateSchema(bookIdParamSchema, 'params'),

@@ -10,6 +10,7 @@ import { errorHandler } from './middlewares/errorHandler.middleware.js';
 
 import { authRouter } from './modules/auth/auth.routes.js';
 import { booksRouter } from './modules/books/books.routes.js';
+import { BooksController } from './modules/books/books.controller.js';
 import { ordersRouter } from './modules/orders/orders.routes.js';
 import { adminRouter } from './modules/admin/admin.routes.js';
 import { accessoriesRouter } from './modules/accessories/accessories.routes.js';
@@ -30,6 +31,9 @@ app.use(corsMiddleware());
 app.use(globalRateLimiter);
 app.use(express.json());
 app.use(cookieParser());
+
+// Dynamic Sitemap at Root
+app.get('/sitemap.xml', BooksController.getSitemap);
 
 // Rutas API v1
 app.use('/api/v1/auth', authRouter);

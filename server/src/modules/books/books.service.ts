@@ -10,14 +10,24 @@ export class BooksService {
    * Downloads an external book cover image, processes it to WebP using sharp via AdminService,
    * and uploads it to Supabase storage. Returns the new Supabase URL, or the original URL on failure.
    */
-  private static async downloadAndProcessCover(coverUrl: string | null | undefined): Promise<string | null> {
+  /**
+   * Downloads an external book cover image, processes it to WebP using sharp via AdminService,
+   * and uploads it to Supabase storage. Returns the new Supabase URL, or the original URL on failure.
+   */
+  public static async downloadAndProcessCover(coverUrl: string | null | undefined): Promise<string | null> {
     if (!coverUrl || coverUrl.trim() === '') {
       return null;
     }
 
+    const isSupabase = coverUrl.includes('supabase.co') ||
+      (process.env.SUPABASE_URL && coverUrl.includes(process.env.SUPABASE_URL));
+    if (isSupabase) {
+      return coverUrl;
+    }
+
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
 
       console.log(`[CoverPipeline] Downloading external cover: ${coverUrl}`);
       const response = await fetch(coverUrl, { signal: controller.signal });
@@ -598,7 +608,7 @@ export class BooksService {
       }
     }
 
-    // Paso D: Asegurar estructura base y log final
+    // Paso D: Asegurar estructura base, procesar portada externa a WebP y log final
     const finalResult: ISBNLookupResult = result || {
       title: null,
       originalTitle: null,
@@ -610,8 +620,65 @@ export class BooksService {
       language: null,
     };
 
+    if (finalResult.coverUrl) {
+      finalResult.coverUrl = await this.downloadAndProcessCover(finalResult.coverUrl);
+    }
+
     console.log(`[Lookup] Final result for ISBN ${isbn}:`, JSON.stringify(finalResult));
     return finalResult;
+  }
+
+  /**
+   * Generates dynamic sitemap.xml content for search engines.
+   */
+  static async generateSitemapXml(): Promise<string> {
+    const baseUrl = process.env.CLIENT_URL || 'https://almalectora.vercel.app';
+    const books = await prisma.book.findMany({
+      where: { isActive: true },
+      select: { id: true, updatedAt: true },
+    });
+    const accessories = await prisma.accessory.findMany({
+      where: { isActive: true },
+      select: { id: true, updatedAt: true },
+    });
+
+    const staticRoutes = [
+      { url: '', priority: '1.0', changefreq: 'daily' },
+      { url: '/libros', priority: '0.9', changefreq: 'daily' },
+      { url: '/accesorios', priority: '0.8', changefreq: 'weekly' },
+    ];
+
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+    xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
+
+    for (const route of staticRoutes) {
+      xml += `  <url>\n`;
+      xml += `    <loc>${baseUrl}${route.url}</loc>\n`;
+      xml += `    <changefreq>${route.changefreq}</changefreq>\n`;
+      xml += `    <priority>${route.priority}</priority>\n`;
+      xml += `  </url>\n`;
+    }
+
+    for (const book of books) {
+      xml += `  <url>\n`;
+      xml += `    <loc>${baseUrl}/libros/${book.id}</loc>\n`;
+      xml += `    <lastmod>${book.updatedAt.toISOString()}</lastmod>\n`;
+      xml += `    <changefreq>weekly</changefreq>\n`;
+      xml += `    <priority>0.7</priority>\n`;
+      xml += `  </url>\n`;
+    }
+
+    for (const acc of accessories) {
+      xml += `  <url>\n`;
+      xml += `    <loc>${baseUrl}/accesorios/${acc.id}</loc>\n`;
+      xml += `    <lastmod>${acc.updatedAt.toISOString()}</lastmod>\n`;
+      xml += `    <changefreq>weekly</changefreq>\n`;
+      xml += `    <priority>0.6</priority>\n`;
+      xml += `  </url>\n`;
+    }
+
+    xml += `</urlset>`;
+    return xml;
   }
 
   /**

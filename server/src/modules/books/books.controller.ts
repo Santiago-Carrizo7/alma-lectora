@@ -98,4 +98,13 @@ export class BooksController {
     const result = await BooksService.getBookById(id);
     res.status(200).json(result);
   }
+
+  /**
+   * Controller method for generating dynamic sitemap.xml.
+   */
+  static async getSitemap(_req: Request, res: Response): Promise<void> {
+    const xml = await BooksService.generateSitemapXml();
+    res.header('Content-Type', 'text/xml');
+    res.status(200).send(xml);
+  }
 }
