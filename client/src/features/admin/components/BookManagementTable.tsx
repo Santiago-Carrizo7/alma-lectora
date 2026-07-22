@@ -113,15 +113,15 @@ export function BookManagementTable() {
   return (
     <div className="space-y-4">
       {/* Search Filter */}
-      <div className="flex justify-between items-center gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
         <input
           type="text"
           value={search}
           onChange={handleSearchChange}
           placeholder="Buscar por título, título original o autor..."
-          className="flex-1 max-w-md bg-paper border border-stone-300 rounded p-2 text-ink text-sm focus:ring-1 focus:ring-forest focus:outline-none"
+          className="w-full sm:max-w-md bg-paper border border-stone-300 rounded p-2 text-ink text-sm focus:ring-1 focus:ring-forest focus:outline-none"
         />
-        <div className="text-xs text-ink-muted">
+        <div className="text-xs text-ink-muted shrink-0">
           Mostrando {books.length} de {total} libros
         </div>
       </div>
@@ -344,7 +344,7 @@ export function BookManagementTable() {
                 </div>
 
                 {/* Fila Inferior */}
-                <div className="flex items-center justify-between pt-1">
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                   {/* Stock Rápido (QuickStock) */}
                   <button
                     type="button"
@@ -365,7 +365,7 @@ export function BookManagementTable() {
                   </button>
 
                   {/* Acciones */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -385,7 +385,7 @@ export function BookManagementTable() {
                         Baja
                       </Button>
                     ) : (
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                         <Button
                           variant="primary"
                           size="sm"

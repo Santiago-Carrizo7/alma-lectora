@@ -125,15 +125,15 @@ export function ComboManagementTable() {
   return (
     <div className="space-y-4">
       {/* Search Filter */}
-      <div className="flex justify-between items-center gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
         <input
           type="text"
           value={search}
           onChange={handleSearchChange}
           placeholder="Buscar por título o descripción..."
-          className="flex-1 max-w-md bg-paper border border-stone-300 rounded p-2 text-ink text-sm focus:ring-1 focus:ring-forest focus:outline-none"
+          className="w-full sm:max-w-md bg-paper border border-stone-300 rounded p-2 text-ink text-sm focus:ring-1 focus:ring-forest focus:outline-none"
         />
-        <div className="text-xs text-ink-muted">
+        <div className="text-xs text-ink-muted shrink-0">
           Mostrando {combos.length} de {total} combos
         </div>
       </div>
@@ -376,7 +376,7 @@ export function ComboManagementTable() {
                 </div>
 
                 {/* Fila Inferior */}
-                <div className="flex items-center justify-between pt-1">
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                   <button
                     type="button"
                     onClick={() => handleStockClick(combo)}
@@ -395,7 +395,7 @@ export function ComboManagementTable() {
                     </span>
                   </button>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -415,7 +415,7 @@ export function ComboManagementTable() {
                         Baja
                       </Button>
                     ) : (
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                         <Button
                           variant="primary"
                           size="sm"
