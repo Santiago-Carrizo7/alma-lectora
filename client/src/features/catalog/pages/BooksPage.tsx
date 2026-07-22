@@ -22,7 +22,7 @@ export function BooksPage() {
     badge = filter.replace('badge:', '');
   }
 
-  const { data, isLoading, error } = useBooks({ search, genre, badge });
+  const { data, isLoading, error } = useBooks({ search, genre, badge, limit: 100 });
   const books = data?.data ?? [];
 
   // Agrupamiento dinámico para la vista "Todos los libros"

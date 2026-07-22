@@ -264,11 +264,11 @@ export function HomePage() {
   const { addItem } = useCart();
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
 
-  // Consultas optimizadas y acotadas según requerimientos de performance
-  const { data: bestSellersData, isLoading: bestSellersLoading } = useBooks({ limit: 12, badge: 'Más vendido' });
-  const { data: noveltiesData, isLoading: noveltiesLoading } = useBooks({ limit: 12, badge: 'Novedad' });
-  const { data: accData, isLoading: accLoading } = useAccessories({ limit: 8, category: 'SEPARADORES' });
-  const { data: combosData, isLoading: combosLoading } = useCombos({ limit: 6 });
+  // Consultas optimizadas con muestra amplia del catálogo
+  const { data: bestSellersData, isLoading: bestSellersLoading } = useBooks({ limit: 16, badge: 'Más vendido' });
+  const { data: noveltiesData, isLoading: noveltiesLoading } = useBooks({ limit: 16, badge: 'Novedad' });
+  const { data: accData, isLoading: accLoading } = useAccessories({ limit: 12, category: 'SEPARADORES' });
+  const { data: combosData, isLoading: combosLoading } = useCombos({ limit: 8 });
 
   const bestSellers = bestSellersData?.data ?? [];
   const novelties = noveltiesData?.data ?? [];

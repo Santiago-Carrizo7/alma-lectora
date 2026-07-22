@@ -20,7 +20,7 @@ export function AccessoriesPage() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
 
-  const { data, isLoading, error } = useAccessories({ search, category });
+  const { data, isLoading, error } = useAccessories({ search, category, limit: 100 });
   const accessories = data?.data ?? [];
 
   const handleAddToCart = (acc: any) => {
