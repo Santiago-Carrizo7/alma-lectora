@@ -84,7 +84,7 @@ async function request<T>(path: string, init?: RequestInit, isRetry = false): Pr
 }
 
 export const apiClient = {
-  get: <T>(path: string) => request<T>(path),
+  get: <T>(path: string, init?: RequestInit) => request<T>(path, init),
   post: <T>(path: string, body: any) =>
     request<T>(path, {
       method: 'POST',

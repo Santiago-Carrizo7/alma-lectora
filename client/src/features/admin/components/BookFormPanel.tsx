@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { Html5Qrcode } from 'html5-qrcode';
 import { apiClient } from '../../../services/api-client';
 import { Button } from '../../../components/ui/Button';
 import { Spinner } from '../../../components/ui/Spinner';
@@ -7,7 +8,7 @@ import { useBookById } from '../hooks/admin.queries';
 import { useCreateBook, useUpdateBook } from '../hooks/admin.mutations';
 import { useToast } from '../../../components/ui/Toast';
 import { compressImage } from '../../../services/image-compressor';
-import { BarcodeScannerModal } from './BarcodeScannerModal';
+import { InlineBarcodeScanner } from './InlineBarcodeScanner';
 
 interface BookFormPanelProps {
   mode: 'create' | 'edit';
@@ -40,9 +41,11 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
   // Upload state and ref
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const barcodeFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Scanner states
+  // Scanner and photo states
   const [isScanning, setIsScanning] = useState(false);
+  const [photoScanning, setPhotoScanning] = useState(false);
   const [lookupLoading, setLookupLoading] = useState(false);
 
   // Queries and mutations
@@ -158,10 +161,14 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
     }
   };
 
-  // Auto-fill from ISBN lookup
+  // Auto-fill from ISBN lookup with defensive AbortController timeout & guaranteed finally block
   const handleIsbnLookup = async (lookupIsbn: string) => {
     if (!lookupIsbn) return;
     setLookupLoading(true);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+
     try {
       const data = await apiClient.get<{
         title: string | null;
@@ -170,7 +177,9 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
         authors: string[];
         synopsis: string | null;
         coverUrl: string | null;
-      }>(`/books/lookup/${lookupIsbn.trim()}`);
+      }>(`/books/lookup/${lookupIsbn.trim()}`, { signal: controller.signal });
+
+      clearTimeout(timeoutId);
 
       if (data && (data.title || (data.authors && data.authors.length > 0))) {
         setTitle(data.originalTitle || data.title || '');
@@ -183,13 +192,59 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
         setFile(null); // Clear local preview since we're using external data
         toast.success('Metadatos autocompletados desde el ISBN exitosamente.');
       } else {
-        toast.error('No se encontraron metadatos para este ISBN. Por favor ingresá los datos manualmente.');
+        toast.error('No se encontraron metadatos para este ISBN. Podés ingresar los datos manualmente.');
       }
     } catch (err: any) {
       console.error(err);
-      toast.error('Error al buscar metadatos: ' + err.message);
+      if (err?.name === 'AbortError') {
+        toast.error('La búsqueda por ISBN tardó demasiado. Por favor intentá de nuevo.');
+      } else {
+        toast.error('Error al buscar metadatos: ' + (err?.message || err));
+      }
     } finally {
+      clearTimeout(timeoutId);
       setLookupLoading(false);
+    }
+  };
+
+  const handleBarcodePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
+
+    setPhotoScanning(true);
+    try {
+      const tempElementId = 'temp-file-scanner-reader';
+      let tempDiv = document.getElementById(tempElementId);
+      if (!tempDiv) {
+        tempDiv = document.createElement('div');
+        tempDiv.id = tempElementId;
+        tempDiv.style.display = 'none';
+        document.body.appendChild(tempDiv);
+      }
+
+      const html5Qrcode = new Html5Qrcode(tempElementId);
+      const decodedText = await html5Qrcode.scanFile(selectedFile, true);
+
+      if (decodedText) {
+        if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+          try {
+            navigator.vibrate?.([80, 40, 80]);
+          } catch (_) {}
+        }
+        setIsbn(decodedText);
+        toast.success(`Código EAN-13 detectado: ${decodedText}`);
+        await handleIsbnLookup(decodedText);
+      } else {
+        toast.error('No se pudo detectar un código EAN-13 en la foto. Verificá que la imagen sea clara e intentalo de nuevo.');
+      }
+    } catch (err: any) {
+      console.error('[scanFile Error]', err);
+      toast.error('No se pudo detectar un código EAN-13 en la foto. Verificá que la imagen sea clara e intentalo de nuevo.');
+    } finally {
+      setPhotoScanning(false);
+      if (barcodeFileInputRef.current) {
+        barcodeFileInputRef.current.value = '';
+      }
     }
   };
 
@@ -217,6 +272,7 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
 
   const handleScanSuccess = async (scannedIsbn: string) => {
     setIsbn(scannedIsbn);
+    setIsScanning(false);
     await handleIsbnLookup(scannedIsbn);
   };
 
@@ -332,27 +388,63 @@ export function BookFormPanel({ mode }: BookFormPanelProps) {
             <div className="bg-paper-dark/50 border border-paper-dark p-5 rounded-xl space-y-4">
               <h3 className="font-serif font-bold text-lg text-ink">Carga con Escáner</h3>
               <p className="text-xs text-ink-muted leading-relaxed">
-                Pulsá el botón para abrir la cámara a pantalla completa y escanear el código de barras (EAN-13) de un libro.
+                Escaneá en vivo con la cámara o tomá una foto clara al código de barras (EAN-13) del libro.
               </p>
 
-              <Button
-                variant="primary"
-                type="button"
-                onClick={() => setIsScanning(true)}
-                className="w-full py-3 flex items-center justify-center gap-2 font-serif font-bold text-sm shadow-md"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 10.5h.008v.008h-.008V10.5Z" />
-                </svg>
-                Abrir Escáner a Pantalla Completa
-              </Button>
+              {isScanning ? (
+                <InlineBarcodeScanner
+                  onScanSuccess={handleScanSuccess}
+                  onClose={() => setIsScanning(false)}
+                />
+              ) : (
+                <div className="space-y-2.5">
+                  <Button
+                    variant="primary"
+                    type="button"
+                    disabled={photoScanning || lookupLoading}
+                    onClick={() => setIsScanning(true)}
+                    className="w-full py-2.5 flex items-center justify-center gap-2 font-semibold text-xs shadow-sm cursor-pointer"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 10.5h.008v.008h-.008V10.5Z" />
+                    </svg>
+                    Escanear en Vivo (Cámara)
+                  </Button>
 
-              <BarcodeScannerModal
-                isOpen={isScanning}
-                onClose={() => setIsScanning(false)}
-                onScanSuccess={handleScanSuccess}
-              />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={photoScanning || lookupLoading}
+                    onClick={() => barcodeFileInputRef.current?.click()}
+                    className="w-full py-2.5 flex items-center justify-center gap-2 border border-stone-300 font-semibold text-xs bg-paper hover:bg-stone-100 cursor-pointer"
+                  >
+                    {photoScanning ? (
+                      <>
+                        <Spinner size="sm" />
+                        <span>Decodificando foto...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4 text-forest" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
+                        </svg>
+                        <span>Tomar Foto al Código</span>
+                      </>
+                    )}
+                  </Button>
+
+                  <input
+                    ref={barcodeFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleBarcodePhotoChange}
+                    disabled={photoScanning || lookupLoading}
+                    className="sr-only"
+                  />
+                </div>
+              )}
             </div>
           ) : (
             <div className="bg-paper-dark/30 border border-paper-dark p-5 rounded-xl text-center space-y-2">
