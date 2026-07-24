@@ -516,14 +516,27 @@ export class BooksService {
   }
 
   /**
-   * Looks up a book by ISBN.
-   * Checks Google Books API first; if that fails or returns nothing, falls back to Open Library API.
-   * If both fail, it returns an empty metadata structure gracefully (Graceful Failure).
+   * Helper to normalize ISBN input by stripping dashes, spaces, and non-alphanumeric chars.
+   */
+  private static cleanIsbn(isbn: string): string {
+    return isbn.replace(/[- ]/g, '').trim();
+  }
+
+  /**
+   * Looks up a book by ISBN using a 3-level resilience cascade:
+   * Level 1: Google Books API strict lookup (q=isbn:${cleanIsbn}).
+   * Level 2: Open Library API.
+   * Level 3: Local Argentina ISBN Register (CAL / Cámara Argentina del Libro).
+   * Secondary Cover Rescue: Micro-query to Google Books if Level 3 recovers title/authors but lacks cover.
+   * Fallback: Semantic Google Books search.
+   * Cover Pipeline: Downloads and processes cover to WebP in Supabase Storage.
    */
   static async lookupBook(isbn: string): Promise<ISBNLookupResult> {
+    const cleanIsbn = this.cleanIsbn(isbn);
+
     try {
       const localBook = await prisma.book.findUnique({
-        where: { isbn },
+        where: { isbn: cleanIsbn },
         include: {
           authors: {
             include: {
@@ -534,7 +547,7 @@ export class BooksService {
       });
 
       if (localBook) {
-        console.log(`[Lookup:CacheLocal] Libro encontrado localmente para ISBN: ${isbn}`);
+        console.log(`[Lookup:CacheLocal] Libro encontrado localmente para ISBN: ${cleanIsbn}`);
         return {
           title: localBook.title,
           originalTitle: localBook.originalTitle,
@@ -547,22 +560,22 @@ export class BooksService {
         };
       }
     } catch (error) {
-      console.error(`[Lookup:CacheLocal] Error checking local database for ISBN ${isbn}:`, error);
+      console.error(`[Lookup:CacheLocal] Error checking local database for ISBN ${cleanIsbn}:`, error);
     }
 
     let result: ISBNLookupResult | null = null;
 
-    // Paso A: Búsqueda estricta en Google Books por ISBN
+    // NIVEL 1: Consulta estricta a Google Books API por ISBN
     try {
-      result = await this.fetchFromGoogleBooks(isbn);
+      result = await this.fetchFromGoogleBooks(cleanIsbn);
     } catch (error) {
-      console.error(`[Lookup] Google Books API lookup failed for ISBN ${isbn}:`, error);
+      console.error(`[Lookup:Nivel1] Google Books API lookup failed for ISBN ${cleanIsbn}:`, error);
     }
 
-    // Paso B: Si result es null, o si title o coverUrl son null, intentar Open Library
-    if (!result || !result.title || !result.coverUrl) {
+    // NIVEL 2: Consulta a Open Library API
+    if (!result || !result.title) {
       try {
-        const openLibraryResult = await this.fetchFromOpenLibrary(isbn);
+        const openLibraryResult = await this.fetchFromOpenLibrary(cleanIsbn);
         if (openLibraryResult) {
           if (result) {
             if (!result.title) result.title = openLibraryResult.title;
@@ -576,15 +589,48 @@ export class BooksService {
           }
         }
       } catch (error) {
-        console.error(`[Lookup] Open Library API lookup failed for ISBN ${isbn}:`, error);
+        console.error(`[Lookup:Nivel2] Open Library API lookup failed for ISBN ${cleanIsbn}:`, error);
       }
     }
 
-    // Paso C: Rescate Semántico si result o result.title sigue siendo null
+    // NIVEL 3: Rescate Local / Cámara Argentina del Libro (CAL)
     if (!result || !result.title) {
       try {
-        console.log(`[Lookup] Strict lookup failed for ISBN ${isbn}. Initiating semantic search fallback...`);
-        const semanticResult = await this.fetchFromGoogleBooksBySearch(isbn);
+        const localCalResult = await this.fetchFromIsbnArgentina(cleanIsbn);
+        if (localCalResult) {
+          if (result) {
+            if (!result.title) result.title = localCalResult.title;
+            if (!result.originalTitle) result.originalTitle = localCalResult.originalTitle;
+            if (!result.coverUrl) result.coverUrl = localCalResult.coverUrl;
+            if (!result.synopsis) result.synopsis = localCalResult.synopsis;
+            if (result.authors.length === 0) result.authors = localCalResult.authors;
+            if (!result.publishedDate) result.publishedDate = localCalResult.publishedDate;
+          } else {
+            result = localCalResult;
+          }
+        }
+      } catch (error) {
+        console.error(`[Lookup:Nivel3] ISBN Argentina / CAL lookup failed for ISBN ${cleanIsbn}:`, error);
+      }
+    }
+
+    // Rescate de Portada: Si se obtienen título y autor pero no portada
+    if (result && result.title && (!result.coverUrl || result.coverUrl.trim() === '')) {
+      try {
+        const fallbackCover = await this.fetchGoogleBooksCoverFallback(result.title, result.authors[0]);
+        if (fallbackCover) {
+          result.coverUrl = fallbackCover;
+        }
+      } catch (error) {
+        console.error(`[Lookup:CoverRescue] Secondary cover rescue failed for ${result.title}:`, error);
+      }
+    }
+
+    // Fallback Semántico: Si los 3 niveles fallan en encontrar título
+    if (!result || !result.title) {
+      try {
+        console.log(`[Lookup] Strict cascading lookups failed for ISBN ${cleanIsbn}. Initiating semantic search fallback...`);
+        const semanticResult = await this.fetchFromGoogleBooksBySearch(cleanIsbn);
         if (semanticResult) {
           if (result) {
             result = {
@@ -604,11 +650,11 @@ export class BooksService {
           }
         }
       } catch (error) {
-        console.error(`[Lookup] Semantic search fallback failed for ISBN ${isbn}:`, error);
+        console.error(`[Lookup] Semantic search fallback failed for ISBN ${cleanIsbn}:`, error);
       }
     }
 
-    // Paso D: Asegurar estructura base, procesar portada externa a WebP y log final
+    // Pipeline Final WebP: descargar y procesar portada externa a WebP en Supabase Storage
     const finalResult: ISBNLookupResult = result || {
       title: null,
       originalTitle: null,
@@ -624,7 +670,7 @@ export class BooksService {
       finalResult.coverUrl = await this.downloadAndProcessCover(finalResult.coverUrl);
     }
 
-    console.log(`[Lookup] Final result for ISBN ${isbn}:`, JSON.stringify(finalResult));
+    console.log(`[Lookup] Final result for ISBN ${cleanIsbn}:`, JSON.stringify(finalResult));
     return finalResult;
   }
 
@@ -1111,5 +1157,145 @@ export class BooksService {
       publishedDate: info.publish_date || null,
       language: null,
     };
+  }
+
+  /**
+   * Helper to retrieve book information from Cámara Argentina del Libro / ISBN Argentina (https://www.isbn.org.ar).
+   * Level 3 Local Rescue for Argentine/Latin American books.
+   */
+  private static async fetchFromIsbnArgentina(cleanIsbn: string): Promise<ISBNLookupResult | null> {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      const url = `https://www.isbn.org.ar/api/books?isbn=${cleanIsbn}`;
+      console.log(`[ISBNArgentina] GET ${url}`);
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          'Accept': 'application/json, text/html, */*',
+          'User-Agent': 'AlmaLectora/1.0',
+        },
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        console.warn(`[ISBNArgentina] Non-OK response: ${response.status} for ISBN ${cleanIsbn}`);
+        return null;
+      }
+
+      const contentType = response.headers.get('content-type') || '';
+      let title: string | null = null;
+      let authors: string[] = [];
+      let synopsis: string | null = null;
+      let publishedDate: string | null = null;
+
+      if (contentType.includes('application/json')) {
+        const data = (await response.json()) as any;
+        title = data.title || data.titulo || null;
+        const rawAuthor = data.author || data.autor || data.authors || data.autores;
+        if (Array.isArray(rawAuthor)) {
+          authors = rawAuthor.map((a: any) => (typeof a === 'string' ? a : a.name || a.nombre)).filter(Boolean);
+        } else if (typeof rawAuthor === 'string' && rawAuthor.trim()) {
+          authors = [rawAuthor.trim()];
+        }
+        synopsis = data.synopsis || data.resumen || data.descripcion || null;
+        publishedDate = data.publishedDate || data.fechaEdicion || data.fecha_publicacion || null;
+      } else {
+        const text = await response.text();
+        const titleMatch = text.match(/<meta\s+property=["']og:title["']\s+content=["']([^"']+)["']/i) ||
+                           text.match(/<title>([^<]+)<\/title>/i);
+        if (titleMatch && titleMatch[1]) {
+          title = titleMatch[1].replace(/ - ISBN Argentina.*/i, '').trim();
+        }
+
+        const authorMatch = text.match(/<meta\s+name=["']author["']\s+content=["']([^"']+)["']/i) ||
+                            text.match(/Autor:\s*([^<\n]+)/i);
+        if (authorMatch && authorMatch[1]) {
+          authors = [authorMatch[1].trim()];
+        }
+
+        const descMatch = text.match(/<meta\s+name=["']description["']\s+content=["']([^"']+)["']/i) ||
+                          text.match(/Sinopsis:\s*([^<\n]+)/i);
+        if (descMatch && descMatch[1]) {
+          synopsis = descMatch[1].trim();
+        }
+      }
+
+      if (!title) {
+        console.warn(`[ISBNArgentina] Could not parse title for ISBN ${cleanIsbn}`);
+        return null;
+      }
+
+      const processedSynopsis = await this.processSynopsis(synopsis, 'es');
+
+      return {
+        title,
+        originalTitle: title,
+        googleBooksId: null,
+        authors,
+        synopsis: processedSynopsis,
+        coverUrl: null,
+        publishedDate,
+        language: 'es',
+      };
+    } catch (error) {
+      console.error(`[ISBNArgentina] Lookup failed for ISBN ${cleanIsbn}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Micro-query to Google Books API searching intitle:${title} inauthor:${author}
+   * strictly to recover book cover image when local source lacks cover.
+   */
+  private static async fetchGoogleBooksCoverFallback(title: string, author?: string): Promise<string | null> {
+    try {
+      const authorParam = author ? ` inauthor:${author}` : '';
+      const query = `intitle:${title}${authorParam}`;
+      const fields = encodeURIComponent('items(volumeInfo(imageLinks))');
+      const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
+      const keyParam = apiKey ? `&key=${apiKey}` : '';
+      const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=1&fields=${fields}${keyParam}`;
+
+      console.log(`[GoogleBooks:CoverFallback] GET ${url}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const data = (await response.json()) as {
+        items?: Array<{
+          volumeInfo?: {
+            imageLinks?: {
+              extraLarge?: string;
+              large?: string;
+              medium?: string;
+              small?: string;
+              thumbnail?: string;
+            };
+          };
+        }>;
+      };
+
+      const item = data.items?.[0];
+      const imageLinks = item?.volumeInfo?.imageLinks ?? {};
+      const rawCover =
+        imageLinks.extraLarge ??
+        imageLinks.large ??
+        imageLinks.medium ??
+        imageLinks.small ??
+        imageLinks.thumbnail ??
+        null;
+
+      return sanitizeGoogleBooksUrl(rawCover);
+    } catch (error) {
+      console.error(`[GoogleBooks:CoverFallback] Micro-query failed for title "${title}":`, error);
+      return null;
+    }
   }
 }
